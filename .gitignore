@@ -1,0 +1,7 @@
+.idea
+.phpunit.cache
+var
+vendor
+
+phpunit.xml
+
