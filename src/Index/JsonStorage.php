@@ -2,34 +2,40 @@
 
 namespace SearchEngine\Index;
 
-use SearchEngine\IDEncoder;
 use SearchEngine\Schema\Schema;
+use SearchEngine\Transformer\Transformer;
 use SearchEngine\Utils\StringHelper;
 
-class JsonStorage implements StorageInterface {
-
+class JsonStorage implements Storage
+{
     private const int INDEX_LINE_LENGTH = 2048;
     private const int DOCS_LINE_LENGTH = 256;
     private const string KEY = 'k';
     private string $docsFile;
-    private string $indexFile;
+    /** @var <string, string> */
+    private array $indexFiles;
     /** @var resource|false */
     private $docsHandler = false;
-    /** @var resource|false */
-    private $indexHandler = false;
+    /** @var array<string, resource|false> */
+    private array $indexHandlers = [];
 
     /** @var array<string, int>  */
-    private array $schemaVariables=[];
+    private array $schemaVariables;
 
     public function __construct(
         string $path,
-        Schema $schema,
+        private readonly Schema $schema,
         private readonly int $indexLineLength = self::INDEX_LINE_LENGTH,
         private readonly int $docsLineLength = self::DOCS_LINE_LENGTH
     ){
         $this->docsFile = $path . DIRECTORY_SEPARATOR . sprintf('%s_docs.json', StringHelper::getShortClass($schema::class));
-        $this->indexFile = $path . DIRECTORY_SEPARATOR . sprintf('%s_index.json',  StringHelper::getShortClass($schema::class));
-        $this->schemaVariables = get_object_vars($schema);
+        $this->schemaVariables = (new \ReflectionClass($schema::class))->getDefaultProperties();
+
+        foreach ($this->schemaVariables as $name => $value) {
+            if ($value & Schema::IS_INDEXED) {
+                $this->indexFiles[$name]= $path . DIRECTORY_SEPARATOR . sprintf('%s_%s_index.json', StringHelper::getShortClass($schema::class), $name);
+            }
+        }
     }
 
     public function initialize(): void
@@ -37,8 +43,10 @@ class JsonStorage implements StorageInterface {
         if (!file_exists($this->docsFile)) {
             file_put_contents($this->docsFile, "");
         }
-        if (!file_exists($this->indexFile)) {
-            file_put_contents($this->indexFile, "");
+        foreach ($this->indexFiles as $indexFile) {
+            if (!file_exists($indexFile)) {
+                file_put_contents($indexFile, "");
+            }
         }
     }
 
@@ -47,25 +55,33 @@ class JsonStorage implements StorageInterface {
         if (file_exists($this->docsFile)) {
             unlink($this->docsFile);
         }
-        if (file_exists($this->indexFile)) {
-            unlink($this->indexFile);
+        foreach ($this->indexFiles as $indexFile) {
+            if (file_exists($indexFile)) {
+                unlink($indexFile);
+            }
         }
 
         $this->initialize();
     }
 
-    public function open(): void
+    public function open(array $opts = ['mode' => 'r+']): void
     {
-        $this->indexHandler = fopen($this->indexFile, 'r+');
-        $this->docsHandler = fopen($this->docsFile, 'r+');
+        foreach ($this->indexFiles as $name => $indexFile) {
+            $this->indexHandlers[$name] = fopen($indexFile, $opts['mode']);
+        }
+        $this->docsHandler = fopen($this->docsFile, $opts['mode']);
     }
 
     public function commit(): void
     {
-        fclose($this->indexHandler);
+        foreach ($this->indexHandlers as $handler) {
+            fclose($handler);
+        }
+        $this->indexHandlers = [];
         fclose($this->docsHandler);
     }
-    public function saveDocument(string $docId, array $data): void {
+    public function saveDocument(string $docId, array $data): void
+    {
         $doc = ['id' => $docId];
         $handler = $this->docsHandler;
 
@@ -101,50 +117,80 @@ class JsonStorage implements StorageInterface {
             if ($value & Schema::IS_INDEXED) {
                 $tokens = $this->tokenize($data[$name]);
                 foreach ($tokens as $token) {
-                    $token = strtolower($token); // Normalize to lowercase
-                    $existingDocIds = $this->loadIndex($token);
+                    /** @var Transformer $transformer */
+                    foreach ($this->schema->getTransformers() as $transformer) {
+                        $token = $transformer->apply($token);
+                        if (null === $token) {
+                            continue 2;
+                        }
+                    }
+                    $existingDocIds = $this->loadIndex($this->indexHandlers[$name], $token);
                     if (!in_array($docId, $existingDocIds)) {
                         $existingDocIds[] = $docId;
-                        $this->saveIndex($token, $existingDocIds);
+                        $this->saveIndex($this->indexHandlers[$name], $token, $existingDocIds);
                     }
                 }
             }
         }
     }
 
-    // Save the index and maintain sorted order
-    private function saveIndex(string $term, array $docIds): void {
-        $handler = $this->indexHandler;
-
+    /**
+     * @param resource $handler
+     * @param string $term
+     * @param string[] $docIds
+     */
+    private function saveIndex($handler, string $term, array $docIds): void
+    {
         if (!$handler) {
             throw new \LogicException('The index handler is not open. Open it with JsonStorage::open().');
         }
 
-        $this->save($handler, sprintf('{"%s":"%s"', self::KEY, $term), [self::KEY => $term, 'ids' => implode(',',$docIds)], $this->indexLineLength, function (&$data, $lineData) {
-            $line = json_decode($lineData, 1, 512, JSON_THROW_ON_ERROR);
-            $data['ids'] = implode(',', array_unique(array_merge(
-                explode(',', $line['ids']),
-                explode(',', $data['ids'])
-            )));
-        });
+        $this->save(
+            $handler,
+            sprintf('{"%s":"%s"', self::KEY, $term),
+            [self::KEY => $term, 'ids' => implode(',', $docIds)],
+            $this->indexLineLength,
+            function (&$data, $lineData) use ($docIds) {
+                $line = json_decode($lineData, 1, 512, JSON_THROW_ON_ERROR);
+                $data['ids'] = implode(',', array_unique(array_merge(
+                    explode(',', $line['ids']),
+                    explode(',', $data['ids'])
+                )));
+            }
+        );
     }
 
-    // Load an index entry by term
-    public function loadIndex(string $term): array
+    private function loadIndices(string $term): array
     {
-        $handler = $this->indexHandler;
-        $pattern = sprintf('{"%s":"%s"', self::KEY, $term);
+        $indices = [];
 
-        $index = $this->load($handler, $pattern, $this->indexLineLength);
-        return isset($index['ids']) ? explode(',',$index['ids']) : [];
+        /** @var Transformer $transformer */
+        foreach ($this->schema->getTransformers() as $transformer) {
+            $term = $transformer->apply($term);
+            if (null === $term) {
+                return $indices;
+            }
+        }
+
+        $indexedVariables = array_filter($this->schemaVariables, fn(string $var) => $var & Schema::IS_INDEXED);
+        foreach ($indexedVariables as $name => $_) {
+            $indices[$name] = $this->loadIndex($this->indexHandlers[$name], $term);
+        }
+
+        return $indices;
     }
 
-    // Search docs by term
+    private function loadIndex($handler, string $term): array
+    {
+        $pattern = sprintf('{"%s":"%s"', self::KEY, $term);
+        $doc = $this->load($handler, $pattern, $this->indexLineLength);
+        return isset($doc['ids']) ? explode(',', $doc['ids']) : [];
+    }
+
     public function search(string $term): array
     {
-        $this->indexHandler = fopen($this->indexFile, 'r');
-        $this->docsHandler = fopen($this->docsFile, 'r');
-        $indices = $this->loadIndex($term);
+        $this->open(['mode' => 'r']);
+        $indices = $this->loadIndices($term);
         $this->commit();
         return $indices;
     }
@@ -196,11 +242,10 @@ class JsonStorage implements StorageInterface {
 
         fseek($handler, $offset); // rewind
         $newLine = json_encode($data, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
-        fwrite($handler,
-            str_pad(
-                $newLine,
-                $lineLength - 1
-            ) . PHP_EOL . $remainingBytes);
+        fwrite(
+            $handler,
+            str_pad($newLine, $lineLength - 1) . PHP_EOL . $remainingBytes
+        );
         flock($handler, LOCK_UN);
     }
 
@@ -232,7 +277,8 @@ class JsonStorage implements StorageInterface {
         return [false, null];
     }
 
-    private function lines($handle): int {
+    private function lines($handle): int
+    {
         $line = 0;
         fseek($handle, 0);
         while (!feof($handle) && fgets($handle) !== false) {
@@ -241,7 +287,8 @@ class JsonStorage implements StorageInterface {
         return $line;
     }
 
-    private function tokenize(string $text): array {
+    private function tokenize(string $text): array
+    {
         return preg_split('/\W+/u', $text, -1, PREG_SPLIT_NO_EMPTY);
     }
 }

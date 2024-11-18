@@ -20,7 +20,6 @@
         }
     ],
     "require": {
-        "wamania/php-stemmer": "3.0.1",
-        "voku/stop-words": "2.0.1"
+        "wamania/php-stemmer": "3.0.1"
     }
 }

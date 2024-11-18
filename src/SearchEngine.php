@@ -1,18 +1,19 @@
 <?php
+
 namespace SearchEngine;
 
-use SearchEngine\Index\StorageInterface;
+use SearchEngine\Index\Storage;
 
 class SearchEngine
 {
-
     private array $documents = [];
 
-    public function __construct(private StorageInterface $storage)
+    public function __construct(private Storage $storage)
     {
     }
 
-    public function addDocument(array $data): self {
+    public function addDocument(array $data): self
+    {
         $id = IDEncoder::encode(
             $this->storage->count() + count($this->documents) + 1
         );
@@ -31,12 +32,13 @@ class SearchEngine
         $this->documents = [];
     }
 
-    public function search(string $term): array {
-        $term = strtolower($term); // Normalize to lowercase
+    public function search(string $term): array
+    {
         return $this->storage->search($term);
     }
 
-    public function getDocument(int $docId): array {
+    public function getDocument(int $docId): array
+    {
         return $this->storage->loadDocument($docId) ?? [];
     }
 }
