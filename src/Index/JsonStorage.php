@@ -27,13 +27,13 @@ class JsonStorage implements Storage
         private readonly Schema $schema,
         private readonly int $indexLineLength = self::INDEX_LINE_LENGTH,
         private readonly int $docsLineLength = self::DOCS_LINE_LENGTH
-    ){
+    ) {
         $this->docsFile = $path . DIRECTORY_SEPARATOR . sprintf('%s_docs.json', StringHelper::getShortClass($schema::class));
         $this->schemaVariables = (new \ReflectionClass($schema::class))->getDefaultProperties();
 
         foreach ($this->schemaVariables as $name => $value) {
             if ($value & Schema::IS_INDEXED) {
-                $this->indexFiles[$name]= $path . DIRECTORY_SEPARATOR . sprintf('%s_%s_index.json', StringHelper::getShortClass($schema::class), $name);
+                $this->indexFiles[$name] = $path . DIRECTORY_SEPARATOR . sprintf('%s_%s_index.json', StringHelper::getShortClass($schema::class), $name);
             }
         }
     }
@@ -187,7 +187,7 @@ class JsonStorage implements Storage
         return isset($doc['ids']) ? explode(',', $doc['ids']) : [];
     }
 
-    public function search(string $term): array
+    public function findIds(string $term): array
     {
         $this->open(['mode' => 'r']);
         $indices = $this->loadIndices($term);
@@ -287,8 +287,13 @@ class JsonStorage implements Storage
         return $line;
     }
 
+    /**
+     * @return array<string>
+     */
     private function tokenize(string $text): array
     {
-        return preg_split('/\W+/u', $text, -1, PREG_SPLIT_NO_EMPTY);
+        $tokens = preg_split('/\W+/u', $text, -1, PREG_SPLIT_NO_EMPTY);
+
+        return $tokens ?: [];
     }
 }

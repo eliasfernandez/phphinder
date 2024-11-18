@@ -6,12 +6,18 @@ use SearchEngine\Index\Storage;
 
 class SearchEngine
 {
+    /**
+     * @var array<array{id:string}>
+     */
     private array $documents = [];
 
     public function __construct(private Storage $storage)
     {
     }
 
+    /**
+     * @param array<string, string> $data
+     */
     public function addDocument(array $data): self
     {
         $id = IDEncoder::encode(
@@ -32,13 +38,19 @@ class SearchEngine
         $this->documents = [];
     }
 
+    /**
+     * @return array<string, array<string>>
+     */
     public function search(string $term): array
     {
-        return $this->storage->search($term);
+        return $this->storage->findIds($term);
     }
 
-    public function getDocument(int $docId): array
+    /**
+     * @return array{id:string}
+     */
+    public function getDocument(string $docId): array
     {
-        return $this->storage->loadDocument($docId) ?? [];
+        return $this->storage->loadDocument($docId);
     }
 }
