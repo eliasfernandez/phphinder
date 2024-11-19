@@ -12,13 +12,14 @@ interface Storage
 
     /**
      * @return array{id: string, ...<string, string>}
+     * @param array<string> $docIds
      */
-    public function loadDocument(string $docId): array;
+    public function getDocuments(array $docIds): array;
     public function saveIndices(string $docId, array $data): void;
 
     /**
      * @return array<string, array<string>>
      */
-    public function findIds(string $term): array;
+    public function findDocsByIndex(string $term, ?string $index = null): array;
     public function count(): int;
 }

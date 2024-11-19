@@ -19,16 +19,16 @@ class QueryParserTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->parser = new QueryParser('content', new TestSchema());
+        $this->parser = new QueryParser('*', new TestSchema());
     }
 
     public function testParseSimpleAndQuery()
     {
-        $query = $this->parser->parse("render shade animate");
+        $query = $this->parser->parse("hello world fun");
         $expected = new AndQuery([
-            new TermQuery("content", "render"),
-            new TermQuery("content", "shade"),
-            new TermQuery("content", "animate"),
+            new TermQuery("*", "hello"),
+            new TermQuery("*", "world"),
+            new TermQuery("*", "fun"),
         ]);
 
         $this->assertEquals($expected, $query);
@@ -36,13 +36,23 @@ class QueryParserTest extends TestCase
 
     public function testParseOrWithFieldsQuery()
     {
-        $query = $this->parser->parse("render OR (title:shade keyword:animate)");
+        $query = $this->parser->parse("hello OR (title:world keyword:fun)");
         $expected = new OrQuery([
-            new TermQuery("content", "render"),
+            new TermQuery("*", "hello"),
             new AndQuery([
-                new TermQuery("title", "shade"),
-                new TermQuery("keyword", "animate"),
+                new TermQuery("title", "world"),
+                new TermQuery("keyword", "fun"),
             ]),
+        ]);
+
+        $this->assertEquals($expected, $query);
+        $query = $this->parser->parse("(hello world) OR fun");
+        $expected = new OrQuery([
+            new AndQuery([
+                new TermQuery("*", "hello"),
+                new TermQuery("*", "world"),
+            ]),
+            new TermQuery("*", "fun"),
         ]);
 
         $this->assertEquals($expected, $query);
@@ -51,7 +61,7 @@ class QueryParserTest extends TestCase
     public function testParsePrefixQuery()
     {
         $query = $this->parser->parse("rend*");
-        $expected = new PrefixQuery("content", "rend");
+        $expected = new PrefixQuery("*", "rend");
 
         $this->assertEquals($expected, $query);
     }
@@ -62,7 +72,7 @@ class QueryParserTest extends TestCase
         $expected = new AndQuery([
             new TermQuery("title", "hello"),
             new OrQuery([
-                new TermQuery("content", "world"),
+                new TermQuery("*", "world"),
                 new PrefixQuery("other", "foo"),
             ]),
         ]);
@@ -76,5 +86,15 @@ class QueryParserTest extends TestCase
         $expected = new NullQuery();
 
         $this->assertEquals($expected, $query);
+    }
+
+
+
+    public function testParseTypesStringCast()
+    {
+        $this->assertEquals('<null>', $this->parser->parse(""));
+        $this->assertEquals('*:hello', $this->parser->parse("hello"));
+        $this->assertEquals('(*:hello AND *:world)', $this->parser->parse("hello world"));
+        $this->assertEquals('(title:hello AND (*:world OR other:foo*))', $this->parser->parse("title:hello (world OR other:foo*)"));
     }
 }

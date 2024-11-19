@@ -23,11 +23,10 @@ class QueryParser
      *    the parsed tokens.
      *
      */
-    public function parse(string $text): ?Query
+    public function parse(string $text): Query
     {
         $tokens = $this->tokenize($text);
         $query = $this->parseTokens($tokens);
-        //eval(\Psy\sh());
         return $query;
     }
 
@@ -51,7 +50,7 @@ class QueryParser
             if ($token === '(') {
                 // Handle opening parenthesis: Parse a subquery recursively
                 $originalPointer = $pointer;
-                $pointer ++;
+                $pointer++;
                 $subquery = $this->parseTokens($tokens, $pointer);
                 $subqueries[] = $subquery;
                 $tokens = array_merge(
@@ -94,5 +93,4 @@ class QueryParser
         // Otherwise, default to "AND" query
         return new AndQuery($subqueries);
     }
-
 }

@@ -4,6 +4,7 @@ namespace SearchEngine\Index;
 
 use SearchEngine\Schema\Schema;
 use SearchEngine\Transformer\Transformer;
+use SearchEngine\Token\Tokenizer;
 use SearchEngine\Utils\StringHelper;
 
 class JsonStorage implements Storage
@@ -25,6 +26,7 @@ class JsonStorage implements Storage
     public function __construct(
         string $path,
         private readonly Schema $schema,
+        private readonly Tokenizer $tokenizer,
         private readonly int $indexLineLength = self::INDEX_LINE_LENGTH,
         private readonly int $docsLineLength = self::DOCS_LINE_LENGTH
     ) {
@@ -103,6 +105,18 @@ class JsonStorage implements Storage
         $this->save($handler, sprintf('{"id":"%s"', $docId), $doc, $this->docsLineLength, fn (&$data, $lineData) => true);
     }
 
+    public function getDocuments(array $docIds): array
+    {
+        $this->open(['mode' => 'r']);
+        $docs = [];
+        foreach ($docIds as $docId) {
+            $docs[$docId] = ['document' => $this->loadDocument($docId)];
+        }
+        $this->commit();
+
+        return $docs;
+    }
+
     public function loadDocument(string $docId): array
     {
         $handler = $this->docsHandler;
@@ -115,16 +129,14 @@ class JsonStorage implements Storage
     {
         foreach ($this->schemaVariables as $name => $value) {
             if ($value & Schema::IS_INDEXED) {
-                $tokens = $this->tokenize($data[$name]);
+                $tokens = $this->tokenizer->apply($data[$name]);
                 foreach ($tokens as $token) {
                     /** @var Transformer $transformer */
-                    foreach ($this->schema->getTransformers() as $transformer) {
-                        $token = $transformer->apply($token);
-                        if (null === $token) {
-                            continue 2;
-                        }
+                    $token = $this->transform($token);
+                    if (null === $token) {
+                        continue;
                     }
-                    $existingDocIds = $this->loadIndex($this->indexHandlers[$name], $token);
+                    $existingDocIds = $this->loadIndex($name, $token);
                     if (!in_array($docId, $existingDocIds)) {
                         $existingDocIds[] = $docId;
                         $this->saveIndex($this->indexHandlers[$name], $token, $existingDocIds);
@@ -164,36 +176,35 @@ class JsonStorage implements Storage
     {
         $indices = [];
 
-        /** @var Transformer $transformer */
-        foreach ($this->schema->getTransformers() as $transformer) {
-            $term = $transformer->apply($term);
-            if (null === $term) {
-                return $indices;
-            }
+        $term = $this->transform($term);
+        if (null === $term) {
+            return $indices;
         }
 
         $indexedVariables = array_filter($this->schemaVariables, fn(string $var) => $var & Schema::IS_INDEXED);
         foreach ($indexedVariables as $name => $_) {
-            $indices[$name] = $this->loadIndex($this->indexHandlers[$name], $term);
+            $indices[$name] = $this->loadIndex($name, $term);
         }
 
         return $indices;
     }
 
-    private function loadIndex($handler, string $term): array
+    private function loadIndex(string $name, string $term): array
     {
+        $handler = $this->indexHandlers[$name];
         $pattern = sprintf('{"%s":"%s"', self::KEY, $term);
         $doc = $this->load($handler, $pattern, $this->indexLineLength);
         return isset($doc['ids']) ? explode(',', $doc['ids']) : [];
     }
 
-    public function findIds(string $term): array
+    public function findDocsByIndex(string $term, ?string $index = null): array
     {
         $this->open(['mode' => 'r']);
-        $indices = $this->loadIndices($term);
+        $indices = $index ? $this->loadIndex($index, $term) : $this->loadIndices($term);
         $this->commit();
         return $indices;
     }
+
 
     public function count(): int
     {
@@ -211,8 +222,10 @@ class JsonStorage implements Storage
         $data = [];
         [$hit, $line] = $this->binarySearch(
             $handler,
-            $pattern
+            $pattern,
+            $lineLength
         );
+
         if ($handler && $hit) {
             fseek($handler, $line * $lineLength);
             $line = fgets($handler);
@@ -228,7 +241,7 @@ class JsonStorage implements Storage
         }
 
         // Perform a binary search to find if the term exists
-        [$hit, $line] = $this->binarySearch($handler, $pattern);
+        [$hit, $line] = $this->binarySearch($handler, $pattern, $lineLength);
         $offset = $line * $lineLength;
         fseek($handler, $offset);
         $lineData = fgets($handler);
@@ -253,16 +266,19 @@ class JsonStorage implements Storage
      * @param resource $handler
      * @return array{bool, int?}
      */
-    private function binarySearch($handler, string $pattern): array
+    private function binarySearch($handler, string $pattern, int $lineLength): array
     {
         if ($handler) {
             $low = 0;
             $high = $this->lines($handler) - 1;
             while ($low <= $high) {
+                // point to the middle
                 $mid = (int)(($low + $high) / 2);
-                $offset = $mid * self::INDEX_LINE_LENGTH;
+                $offset = ($mid) * $lineLength;
                 fseek($handler, $offset);
                 $line = fgets($handler);
+
+                // compare
                 $comparison = strcmp(substr($line, 0, strlen($pattern)), $pattern);
                 if ($comparison === 0) {
                     return [true, $mid]; // Term found
@@ -287,13 +303,15 @@ class JsonStorage implements Storage
         return $line;
     }
 
-    /**
-     * @return array<string>
-     */
-    private function tokenize(string $text): array
+    private function transform(mixed $term): mixed
     {
-        $tokens = preg_split('/\W+/u', $text, -1, PREG_SPLIT_NO_EMPTY);
-
-        return $tokens ?: [];
+        /** @var Transformer $transformer */
+        foreach ($this->schema->getTransformers() as $transformer) {
+            $term = $transformer->apply($term);
+            if (null === $term) {
+                break;
+            }
+        }
+        return $term;
     }
 }

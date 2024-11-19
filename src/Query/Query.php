@@ -2,7 +2,8 @@
 
 namespace SearchEngine\Query;
 
-abstract class Query implements \Stringable {
+abstract class Query implements \Stringable
+{
     protected array $subqueries = [];
 
     protected string $joint;
@@ -39,5 +40,13 @@ abstract class Query implements \Stringable {
             $normalized[] = $subquery->normalize();
         }
         return new static($normalized, $this->boost);
+    }
+
+    /**
+     * @return array<Query>
+     */
+    public function getSubqueries(): array
+    {
+        return $this->subqueries;
     }
 }
