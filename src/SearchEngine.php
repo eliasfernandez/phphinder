@@ -4,14 +4,17 @@ namespace SearchEngine;
 
 use SearchEngine\Index\Storage;
 use SearchEngine\Query\AndQuery;
+use SearchEngine\Query\NotQuery;
 use SearchEngine\Query\OrQuery;
 use SearchEngine\Query\PrefixQuery;
 use SearchEngine\Query\Query;
 use SearchEngine\Query\QueryParser;
 use SearchEngine\Query\TermQuery;
+use SearchEngine\Query\TextQuery;
 use SearchEngine\Schema\Schema;
 use SearchEngine\Token\Tokenizer;
 use SearchEngine\Utils\ArrayHelper;
+use SearchEngine\Utils\IDEncoder;
 
 class SearchEngine
 {
@@ -67,26 +70,22 @@ class SearchEngine
      */
     public function search(string $phrase): array
     {
-        $parser = new QueryParser(self::ANY_SYMBOL, $this->schema);
+        $parser = new QueryParser(self::ANY_SYMBOL);
         $query = $parser->parse($phrase);
-
         return $this->computeQuery($query, $phrase, []);
     }
 
     /**
      * @param array<Query> $subqueries
+     * @param array<array{id:string}> $docs
      */
     private function searchAnd(array $subqueries, string $phrase, array $docs): array
     {
+        $subqueries = $this->sortQueries($subqueries);
         foreach ($subqueries as $query) {
             $docs = $this->computeQuery($query, $phrase, $docs);
         }
-
-        // only get documents with all the tokens
-        $docs = array_filter(
-            $docs,
-            fn (array $doc) => count($doc['terms']) === count($subqueries)
-        );
+        $docs = $this->filterInAndCondition($subqueries, $docs);
 
         foreach ($this->schemaVariables as $name => $value) {
             if ($value & Schema::IS_FULLTEXT) {
@@ -105,9 +104,11 @@ class SearchEngine
 
     /**
      * @param array<Query> $subqueries
+     * @param array<array{id:string}> $docs
      */
     public function searchOr(array $subqueries, string $phrase, array $docs): array
     {
+        $subqueries = $this->sortQueries($subqueries);
         foreach ($subqueries as $query) {
             $docs = $this->computeQuery($query, $phrase, $docs);
         }
@@ -127,6 +128,25 @@ class SearchEngine
         return $docs;
     }
 
+    /**
+     * @param array<array{id:string}> $docs
+     */
+    public function searchNot(Query $query, string $phrase, array $docs): array
+    {
+        $excludedDocs = $this->computeQuery($query, $phrase, []);
+        $keys = array_keys($excludedDocs);
+        foreach ($keys as $key) {
+            if (isset($docs[$key])) {
+                unset($docs[$key]);
+            }
+        }
+        return $docs;
+    }
+
+
+    /**
+     * @param array<array{id:string}> $docs
+     */
     public function searchTerm(Query $query, string $phrase, array $docs): array
     {
         $termByIndex = [];
@@ -157,19 +177,51 @@ class SearchEngine
         );
     }
 
+    /**
+     * @param array<array{id:string}> $docs
+     */
     public function searchPrefix(Query $query, string $phrase, array $docs): array
     {
         return $docs;
     }
 
+    /**
+     * @param Query $query
+     * @param string $phrase
+     * @param array<array{id:string}> $docs
+     * @return array<array{id:string}>
+     */
     private function computeQuery(Query $query, string $phrase, array $docs): array
     {
         return match (true) {
             $query instanceof AndQuery => $this->searchAnd($query->getSubqueries(), $phrase, $docs),
             $query instanceof OrQuery => $this->searchOr($query->getSubqueries(), $phrase, $docs),
             $query instanceof TermQuery => $this->searchTerm($query, $phrase, $docs),
+            $query instanceof NotQuery => $this->searchNot($query->getSubquery(), $phrase, $docs),
             $query instanceof PrefixQuery => $this->searchPrefix($query, $phrase, $docs),
             default => $docs
         };
+    }
+
+    /**
+     * Assumes there must be the same amount of terms and text subqueries
+     * @param array<Query> $subqueries
+     */
+    private function filterInAndCondition(array $subqueries, array $docs): array
+    {
+        $textQueries = array_filter($subqueries, fn($q) => $q instanceof TextQuery);
+        $docs = array_filter(
+            $docs,
+            fn(array $doc) => count($doc['terms']) === count($textQueries)
+        );
+        return $docs;
+    }
+
+    private function sortQueries(array $subqueries): array
+    {
+        usort($subqueries, function (Query $a, Query $b) {
+            return $a->getPriority() <=> $b->getPriority();
+        });
+        return $subqueries;
     }
 }

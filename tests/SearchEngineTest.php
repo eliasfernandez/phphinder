@@ -79,6 +79,27 @@ class SearchEngineTest extends TestCase
         $this->assertFalse($results[2]['fulltext']);
     }
 
+    public function testSearchNot(): void
+    {
+        $results = $this->engine->search('hello NOT(world)');
+
+        $this->assertIsArray($results);
+        $this->assertCount(1, $results);
+        $this->assertCount(1, $results[3]['terms']);
+        $this->assertCount(1, $results[3]['indices']);
+        $this->assertFalse($results[3]['fulltext']);
+    }
+
+    public function testSearchNotAtFirst(): void
+    {
+        $results = $this->engine->search('NOT(world) hello');
+        $this->assertIsArray($results);
+        $this->assertCount(1, $results);
+        $this->assertCount(1, $results[3]['terms']);
+        $this->assertCount(1, $results[3]['indices']);
+        $this->assertFalse($results[3]['fulltext']);
+    }
+
     public function testFindDocsByIndex(): void
     {
         $results = $this->engine->findDocsByIndex("php");

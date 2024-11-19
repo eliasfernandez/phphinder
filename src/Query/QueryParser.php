@@ -6,10 +6,8 @@ use SearchEngine\Schema\Schema;
 
 class QueryParser
 {
-    public function __construct(
-        private string $fieldName,
-        private ?Schema $schema,
-    ) {
+    public function __construct(private string $fieldName)
+    {
     }
 
     /**
@@ -33,8 +31,8 @@ class QueryParser
     private function tokenize(string $query): array
     {
         // Split the query into tokens: whitespace, operators, parentheses, field:value, etc.
-        $tokens =  preg_split('/(\s+|OR|\(|\)|\w+\*|\w+:\w+\*|\w+:\w+)/', $query, -1, PREG_SPLIT_NO_EMPTY | PREG_SPLIT_DELIM_CAPTURE);
-        return array_values(array_filter($tokens, fn ($token) => trim($token) !== ''));
+        $tokens =  preg_split('/(\s+|OR|NOT\(|AND|\(|\)|\w+\*|\w+:\w+\*|\w+:\w+)/', $query, -1, PREG_SPLIT_NO_EMPTY | PREG_SPLIT_DELIM_CAPTURE);
+        return array_values(array_filter($tokens, fn ($token) => trim($token) !== '' && trim($token) !== 'AND'));
     }
 
     private function parseTokens(array &$tokens, &$pointer = 0): Query
@@ -44,24 +42,24 @@ class QueryParser
         }
         $operatorStack = [];
         $subqueries = [];
-
         while ($pointer < count($tokens)) {
             $token = trim($tokens[$pointer]);
-            if ($token === '(') {
+            if ($token === '(' || $token === 'NOT(') {
                 // Handle opening parenthesis: Parse a subquery recursively
                 $originalPointer = $pointer;
                 $pointer++;
                 $subquery = $this->parseTokens($tokens, $pointer);
-                $subqueries[] = $subquery;
+                $subqueries[] = $token === 'NOT(' ? new NotQuery($subquery): $subquery;
                 $tokens = array_merge(
                     array_slice($tokens, 0, $originalPointer),
-                    array_slice($tokens, $pointer),
+                    array_slice($tokens, $pointer + 1),
                 );
                 $pointer = $originalPointer;
+                continue;
             } elseif ($token === ')') {
-                break;
                 // Handle closing parenthesis: Return current subquery group
-            } elseif (strtoupper($token) === 'OR') {
+                break;
+            } elseif ($token === 'OR') {
                 // Handle OR operator: Create an OR query from the subqueries
                 $operatorStack[] = 'OR';
             } elseif (preg_match('/^(\w+)\*$/', $token, $matches)) {

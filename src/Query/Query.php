@@ -6,6 +6,8 @@ abstract class Query implements \Stringable
 {
     protected array $subqueries = [];
 
+    protected int $priority = 0;
+
     protected string $joint;
 
     /**
@@ -48,5 +50,10 @@ abstract class Query implements \Stringable
     public function getSubqueries(): array
     {
         return $this->subqueries;
+    }
+
+    public function getPriority(): int
+    {
+        return $this->priority;
     }
 }

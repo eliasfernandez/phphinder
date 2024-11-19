@@ -1,6 +1,6 @@
 <?php
 
-namespace SearchEngine;
+namespace SearchEngine\Utils;
 
 class IDEncoder
 {

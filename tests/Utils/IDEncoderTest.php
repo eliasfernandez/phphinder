@@ -1,11 +1,11 @@
 <?php
 
-namespace Tests;
+namespace Tests\Utils;
 
 
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use SearchEngine\IDEncoder;
+use SearchEngine\Utils\IDEncoder;
 
 #[CoversClass(IDEncoder::class)]
 class IDEncoderTest extends TestCase {
