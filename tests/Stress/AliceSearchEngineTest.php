@@ -38,7 +38,7 @@ class AliceSearchEngineTest extends TestCase
             $chapter = 'unknown';
             $line = 0;
             while (!feof($handler)) {
-                $line ++;
+                $line++;
                 if ($line % 100 == 0) {
                     $t = microtime(true);
                     $this->engine->flush();
@@ -74,17 +74,17 @@ class AliceSearchEngineTest extends TestCase
         $results = $this->engine->search($search);
         $diff = microtime(true) - $t;
         $this->assertLessThan($time, $diff, sprintf('more than %s seconds to search %s', $search, $time));
-        fwrite(STDERR, print_r($diff, TRUE));
+        //fwrite(STDERR, print_r($diff, TRUE));
         $this->assertCount($matches, $results);
     }
+
     public static function provideSearches(): array
     {
         return [
-            ['Mabel', 0.1, 4],
-            ['Alice', 0.6, 400],
-            ['said poor Alice', 2., 1],
-            ['Alice NOT(wonderland)', 0.6, 395],
+            ['Mabel', 0.05, 4],
+            ['Alice', 0.3, 400],
+            ['said poor Alice', 1., 1],
+            ['Alice NOT(wonderland)', 0.3, 395],
         ];
     }
-
 }

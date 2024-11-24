@@ -9,7 +9,7 @@ use SearchEngine\Utils\StringHelper;
 
 class JsonStorage implements Storage
 {
-    private const int INDEX_LINE_LENGTH_MIN = 2048;
+    private const int INDEX_LINE_LENGTH_MIN = 128;
     private const int DOCS_LINE_LENGTH = 256;
     private const string KEY = 'k';
     private FileIndex $docs;
@@ -31,7 +31,7 @@ class JsonStorage implements Storage
 
         foreach ($this->schemaVariables as $name => $value) {
             if ($value & Schema::IS_INDEXED) {
-                $this->indices[$name] = new FileIndex($path . DIRECTORY_SEPARATOR . sprintf('%s_%s_index.json', StringHelper::getShortClass($schema::class), $name), $this->indexLineLength);
+                $this->indices[$name] = new FileIndex($path . DIRECTORY_SEPARATOR . sprintf('%s_%s_index.json', StringHelper::getShortClass($schema::class), $name));
             }
         }
     }
@@ -67,6 +67,9 @@ class JsonStorage implements Storage
     {
         foreach ($this->indices as $index) {
             $index->open($opts);
+            if (!$index->getLength()) {
+                $index->calculateLength();
+            }
         }
         $this->docs->open($opts);
     }
@@ -244,12 +247,26 @@ class JsonStorage implements Storage
             $remainingBytes = stream_get_contents($index->getHandler());
         }
 
-        $index->moveTo($offset); // rewind
+
         $newLine = json_encode($data, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
-        fwrite(
-            $index->getHandler(),
-            str_pad($newLine, $index->getLength() - 1) . PHP_EOL . $remainingBytes
-        );
+        if (strlen($newLine) + 1 > $index->getLength()) { // recalculate index length
+            $newLength = $this->getNewLength(strlen($newLine) + 1, $index);
+            $index->moveTo(0);
+            $fileLines = explode(PHP_EOL, stream_get_contents($index->getHandler()));
+            $index->moveTo(0);
+            $i=0;
+            foreach ($fileLines as $fileLine) {
+                if ($fileLine === '') {
+                    continue;
+                }
+                $index->write(str_pad($fileLine, $newLength - 1) . PHP_EOL);
+            }
+            $index->setLength($newLength);
+            $offset = $line * $index->getLength();
+        }
+        $index->moveTo($offset); // rewind
+
+        $index->write(str_pad($newLine, $index->getLength() - 1) . PHP_EOL . $remainingBytes);
         flock($index->getHandler(), LOCK_UN);
     }
 
@@ -290,5 +307,12 @@ class JsonStorage implements Storage
             }
         }
         return $term;
+    }
+
+    private function getNewLength(int $length, FileIndex $index): int
+    {
+        $multiplier = ceil($length / self::INDEX_LINE_LENGTH_MIN);
+        $newLength = intval(self::INDEX_LINE_LENGTH_MIN * $multiplier);
+        return $newLength;
     }
 }

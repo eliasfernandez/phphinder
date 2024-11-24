@@ -6,7 +6,7 @@ class FileIndex
 {
     /** @var resource $handler */
     private $handler;
-    public function __construct(private string $path, private int $lineLength)
+    public function __construct(private string $path, private ?int $lineLength = null)
     {
     }
 
@@ -33,7 +33,7 @@ class FileIndex
         return $this->path;
     }
 
-    public function getLength(): int
+    public function getLength(): ?int
     {
         return $this->lineLength;
     }
@@ -42,6 +42,13 @@ class FileIndex
     {
         $this->lineLength = $lineLength;
         return $this;
+    }
+
+
+    public function calculateLength(): void
+    {
+        $this->moveTo(0);
+        $this->setLength(strlen($this->getLine()));
     }
 
     public function isCreated(): bool
@@ -67,5 +74,10 @@ class FileIndex
     public function getLine(): string|false
     {
         return fgets($this->handler);
+    }
+
+    public function write(string $text): void
+    {
+        fwrite($this->handler, $text);
     }
 }
