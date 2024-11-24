@@ -31,4 +31,9 @@ final class PrefixQuery extends Query implements TextQuery
     {
         return $this->prefix;
     }
+
+    public function getBoost(): float
+    {
+        return $this->boost;
+    }
 }

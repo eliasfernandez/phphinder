@@ -33,12 +33,12 @@ class SearchEngineTest extends TestCase
             'text' => "hello world! This is a PHP search engine.",
             'description' => 'this is a description'
         ])->addDocument([
-            'title' => 'españoles!',
+            'title' => 'hello!',
             'text' => "PHP españa makes web development fun to the world.",
             'description' => 'Describe the problems',
         ])->addDocument([
             'title' => 'hi!',
-            'text' => "hello search! This is the minimal PHP search engine.",
+            'text' => "hello search! This is the minimal PHP search engine for the world.",
             'description' => 'this is a description'
         ]);
 
@@ -130,5 +130,15 @@ class SearchEngineTest extends TestCase
         $this->expectExceptionMessage('No `title` key provided for doc {"text":"hello world!"}');
         $this->engine->flush();
         $this->engine->findDocsByIndex("php");
+    }
+
+    public function testSortedResults(): void
+    {
+        $results = $this->engine->search('hello world');
+        $this->assertIsArray($results);
+        $this->assertCount(3, $results);
+        $this->assertCount(2, $results[1]['terms']);
+        $this->assertCount(1, $results[2]['indices']);
+        $this->assertTrue($results[1]['fulltext']);
     }
 }

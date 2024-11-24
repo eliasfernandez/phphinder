@@ -72,68 +72,49 @@ class SearchEngine
     {
         $parser = new QueryParser(self::ANY_SYMBOL);
         $query = $parser->parse($phrase);
-        return $this->computeQuery($query, $phrase, []);
+        return $this->computeQuery($query, [], $phrase);
     }
 
     /**
      * @param array<Query> $subqueries
      * @param array<array{id:string}> $docs
      */
-    private function searchAnd(array $subqueries, string $phrase, array $docs): array
+    private function searchAnd(array $subqueries, array $docs, string $phrase): array
     {
         $subqueries = $this->sortQueries($subqueries);
         foreach ($subqueries as $query) {
-            $docs = $this->computeQuery($query, $phrase, $docs);
+            $docs = $this->computeQuery($query, $docs, $phrase);
         }
         $docs = $this->filterInAndCondition($subqueries, $docs);
-
-        foreach ($this->schemaVariables as $name => $value) {
-            if ($value & Schema::IS_FULLTEXT) {
-                foreach ($docs as $key => $doc) {
-                    if (!isset($doc['document'][$name])) {
-                        throw new \LogicException(
-                            sprintf('Field `%s` is declared as fulltext but not stored.', $name)
-                        );
-                    }
-                    $docs[$key]['fulltext'] = str_contains($doc['document'][$name], $phrase);
-                }
-            }
-        }
-        return $docs;
+        $docs = $this->assignFulltextMatch($docs, $phrase);
+        $docs = $this->weight($docs, $subqueries);
+        return $this->sort($docs);
     }
 
     /**
      * @param array<Query> $subqueries
      * @param array<array{id:string}> $docs
      */
-    public function searchOr(array $subqueries, string $phrase, array $docs): array
+    private function searchOr(array $subqueries, array $docs, string $phrase): array
     {
         $subqueries = $this->sortQueries($subqueries);
         foreach ($subqueries as $query) {
-            $docs = $this->computeQuery($query, $phrase, $docs);
+            $docs = $this->computeQuery($query, $docs, $phrase);
         }
 
-        foreach ($this->schemaVariables as $name => $value) {
-            if ($value & Schema::IS_FULLTEXT) {
-                foreach ($docs as $key => $doc) {
-                    if (!isset($doc['document'][$name])) {
-                        throw new \LogicException(
-                            sprintf('Field `%s` is declared as fulltext but not stored.', $name)
-                        );
-                    }
-                    $docs[$key]['fulltext'] = str_contains($doc['document'][$name], $phrase);
-                }
-            }
-        }
+        $docs = $this->assignFulltextMatch($docs, $phrase);
+        $docs = $this->weight($docs, $subqueries);
+        $docs = $this->sort($docs);
+
         return $docs;
     }
 
     /**
      * @param array<array{id:string}> $docs
      */
-    public function searchNot(Query $query, string $phrase, array $docs): array
+    private function searchNot(Query $query, array $docs, string $phrase): array
     {
-        $excludedDocs = $this->computeQuery($query, $phrase, []);
+        $excludedDocs = $this->computeQuery($query, [], $phrase);
         $keys = array_keys($excludedDocs);
         foreach ($keys as $key) {
             if (isset($docs[$key])) {
@@ -147,7 +128,7 @@ class SearchEngine
     /**
      * @param array<array{id:string}> $docs
      */
-    public function searchTerm(Query $query, string $phrase, array $docs): array
+    private function searchTerm(Query $query, array $docs, string $phrase): array
     {
         $termByIndex = [];
 
@@ -158,15 +139,21 @@ class SearchEngine
 
         foreach ($termByIndex as $term => $indices) {
             foreach ($indices as $index => $data) {
-                foreach ($data as $doc) {
-                    if (!isset($docs[$doc])) {
-                        $docs[strval($doc)] = [
+                foreach ($data as $key) {
+                    if (!isset($docs[$key])) {
+                        $docs[$key] = [
                             'indices' => [$index],
                             'terms' => [],
                             'fulltext' => false,
                         ];
                     }
-                    $docs[strval($doc)]['terms'][] = $term;
+                    $docs[$key] = array_merge_recursive(
+                        $docs[$key],
+                        [
+                            'indices' => !in_array($index, $docs[$key]['indices']) ? [$index] : [],
+                            'terms' => [$term],
+                        ]
+                    );
                 }
             }
         }
@@ -179,26 +166,25 @@ class SearchEngine
 
     /**
      * @param array<array{id:string}> $docs
+     * @todo
      */
-    public function searchPrefix(Query $query, string $phrase, array $docs): array
+    private function searchPrefix(Query $query, array $docs, string $phrase): array
     {
         return $docs;
     }
 
     /**
-     * @param Query $query
-     * @param string $phrase
      * @param array<array{id:string}> $docs
      * @return array<array{id:string}>
      */
-    private function computeQuery(Query $query, string $phrase, array $docs): array
+    private function computeQuery(Query $query, array $docs, string $phrase): array
     {
         return match (true) {
-            $query instanceof AndQuery => $this->searchAnd($query->getSubqueries(), $phrase, $docs),
-            $query instanceof OrQuery => $this->searchOr($query->getSubqueries(), $phrase, $docs),
-            $query instanceof TermQuery => $this->searchTerm($query, $phrase, $docs),
-            $query instanceof NotQuery => $this->searchNot($query->getSubquery(), $phrase, $docs),
-            $query instanceof PrefixQuery => $this->searchPrefix($query, $phrase, $docs),
+            $query instanceof AndQuery => $this->searchAnd($query->getSubqueries(), $docs, $phrase),
+            $query instanceof OrQuery => $this->searchOr($query->getSubqueries(), $docs, $phrase),
+            $query instanceof TermQuery => $this->searchTerm($query, $docs, $phrase),
+            $query instanceof NotQuery => $this->searchNot($query->getSubquery(), $docs, $phrase),
+            $query instanceof PrefixQuery => $this->searchPrefix($query, $docs, $phrase),
             default => $docs
         };
     }
@@ -209,19 +195,126 @@ class SearchEngine
      */
     private function filterInAndCondition(array $subqueries, array $docs): array
     {
-        $textQueries = array_filter($subqueries, fn($q) => $q instanceof TextQuery);
-        $docs = array_filter(
+        $textQueries = $this->filterTextQueries($subqueries);
+        return array_filter(
             $docs,
             fn(array $doc) => count($doc['terms']) === count($textQueries)
         );
-        return $docs;
     }
 
+    /**
+     * @param array<Query> $subqueries
+     * @return array<Query>
+     */
     private function sortQueries(array $subqueries): array
     {
         usort($subqueries, function (Query $a, Query $b) {
             return $a->getPriority() <=> $b->getPriority();
         });
         return $subqueries;
+    }
+
+    /**
+     * @param array<array{id:string}> $docs
+     * @return array<array{id:string}>
+     */
+    private function assignFulltextMatch(array $docs, string $phrase): array
+    {
+        foreach ($this->schemaVariables as $name => $value) {
+            if ($value & Schema::IS_FULLTEXT) {
+                foreach ($docs as $key => $doc) {
+                    if (!isset($doc['document'][$name])) {
+                        throw new \LogicException(
+                            sprintf('Field `%s` is declared as fulltext but not stored.', $name)
+                        );
+                    }
+                    $docs[$key]['fulltext'] = str_contains($doc['document'][$name], $phrase);
+                }
+            }
+        }
+        return $docs;
+    }
+
+    /**
+     * @param array<array{id:string}> $docs
+     * @param array<Query> $queries
+     * @return array<array{id:string}>
+     */
+    private function weight(array $docs, array $queries): array
+    {
+        $queries = $this->filterTextQueries($queries);
+
+        $terms = [];
+        foreach ($queries as $query) {
+            if (!isset($terms[$query->getField()])) {
+                $terms[$query->getField()] = [];
+            }
+            $terms[$query->getField()][] = ['term' => $query->getValue(), 'boost' => $query->getBoost()];
+        }
+
+        foreach ($docs as $key => $doc) {
+            $docs[$key]['weight'] = $this->calculateScore($doc, $terms);
+        }
+        return $docs;
+    }
+
+    /**
+     * @param array<array{id:string, weight:float}> $docs
+     * @return array<array{id:string}>
+     */
+    private function sort(array &$docs): array
+    {
+        usort($docs, fn ($a, $b) => $b['weight'] <=> $a['weight']);
+
+        return $docs;
+    }
+    /**
+     * @param array<array{id:string}> $doc
+     * @param array<string, array{term: string, boost: float}> $terms
+     */
+    private function calculateScore(array $doc, array $terms): float
+    {
+        $score = 0.0;
+
+        foreach ($doc['indices'] as $index) {
+            if (isset($terms[$index])) {
+                $score += $this->boostTermByIndex($terms[$index], $doc['terms'], $score);
+            } else if (isset($terms[self::ANY_SYMBOL])) {
+                $score += $this->boostTermByIndex($terms[self::ANY_SYMBOL], $doc['terms'], $score);
+            }
+        }
+
+
+        if ($doc['fulltext']) {
+            $score += 10.0;
+        }
+
+        $score += 2.0 * count($doc['terms']);
+
+        return $score;
+    }
+
+    /**
+     * @param array<Query> $subqueries
+     * @return array<TextQuery>
+     */
+    private function filterTextQueries(array $subqueries): array
+    {
+        return array_filter($subqueries, fn($q) => $q instanceof TextQuery);
+    }
+
+    private function boostTermByIndex($termsByIndex, $terms, float $score): float
+    {
+        $indexTerms = [];
+        $boost = 0.0;
+        foreach ($termsByIndex as $term) {
+            $indexTerms [] = $term['term'];
+            $boost += $term['boost'];
+        }
+        $termsInIndex = floatval(count(array_intersect($indexTerms, $terms)));
+        if ($termsInIndex > 0) {
+            $score += $termsInIndex * $boost / $termsInIndex;
+        }
+        return $score;
     }
 }

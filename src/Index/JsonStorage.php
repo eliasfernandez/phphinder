@@ -9,17 +9,12 @@ use SearchEngine\Utils\StringHelper;
 
 class JsonStorage implements Storage
 {
-    private const int INDEX_LINE_LENGTH = 2048;
+    private const int INDEX_LINE_LENGTH_MIN = 2048;
     private const int DOCS_LINE_LENGTH = 256;
     private const string KEY = 'k';
-    private string $docsFile;
-    /** @var <string, string> */
-    private array $indexFiles;
-    /** @var resource|false */
-    private $docsHandler = false;
-    /** @var array<string, resource|false> */
-    private array $indexHandlers = [];
-
+    private FileIndex $docs;
+    /** @var array<string, FileIndex> */
+    private array $indices;
     /** @var array<string, int>  */
     private array $schemaVariables;
 
@@ -27,39 +22,41 @@ class JsonStorage implements Storage
         string $path,
         private readonly Schema $schema,
         private readonly Tokenizer $tokenizer,
-        private readonly int $indexLineLength = self::INDEX_LINE_LENGTH,
+        private readonly int $indexLineLength = self::INDEX_LINE_LENGTH_MIN,
         private readonly int $docsLineLength = self::DOCS_LINE_LENGTH
     ) {
-        $this->docsFile = $path . DIRECTORY_SEPARATOR . sprintf('%s_docs.json', StringHelper::getShortClass($schema::class));
+
+        $this->docs = new FileIndex($path . DIRECTORY_SEPARATOR . sprintf('%s_docs.json', StringHelper::getShortClass($schema::class)), $this->docsLineLength);
         $this->schemaVariables = (new \ReflectionClass($schema::class))->getDefaultProperties();
 
         foreach ($this->schemaVariables as $name => $value) {
             if ($value & Schema::IS_INDEXED) {
-                $this->indexFiles[$name] = $path . DIRECTORY_SEPARATOR . sprintf('%s_%s_index.json', StringHelper::getShortClass($schema::class), $name);
+                $this->indices[$name] = new FileIndex($path . DIRECTORY_SEPARATOR . sprintf('%s_%s_index.json', StringHelper::getShortClass($schema::class), $name), $this->indexLineLength);
             }
         }
     }
 
     public function initialize(): void
     {
-        if (!file_exists($this->docsFile)) {
-            file_put_contents($this->docsFile, "");
+        if (!$this->docs->isCreated()) {
+            file_put_contents($this->docs->getPath(), "");
         }
-        foreach ($this->indexFiles as $indexFile) {
-            if (!file_exists($indexFile)) {
-                file_put_contents($indexFile, "");
+        /** @var FileIndex $index */
+        foreach ($this->indices as $index) {
+            if (!$index->isCreated()) {
+                file_put_contents($index->getPath(), "");
             }
         }
     }
 
     public function truncate(): void
     {
-        if (file_exists($this->docsFile)) {
-            unlink($this->docsFile);
+        if ($this->docs->isCreated()) {
+            unlink($this->docs->getPath());
         }
-        foreach ($this->indexFiles as $indexFile) {
-            if (file_exists($indexFile)) {
-                unlink($indexFile);
+        foreach ($this->indices as $index) {
+            if ($index->isCreated()) {
+                unlink($index->getPath());
             }
         }
 
@@ -68,24 +65,23 @@ class JsonStorage implements Storage
 
     public function open(array $opts = ['mode' => 'r+']): void
     {
-        foreach ($this->indexFiles as $name => $indexFile) {
-            $this->indexHandlers[$name] = fopen($indexFile, $opts['mode']);
+        foreach ($this->indices as $index) {
+            $index->open($opts);
         }
-        $this->docsHandler = fopen($this->docsFile, $opts['mode']);
+        $this->docs->open($opts);
     }
 
     public function commit(): void
     {
-        foreach ($this->indexHandlers as $handler) {
-            fclose($handler);
+        foreach ($this->indices as $index) {
+            $index->close();
         }
-        $this->indexHandlers = [];
-        fclose($this->docsHandler);
+        $this->docs->close();
     }
     public function saveDocument(string $docId, array $data): void
     {
         $doc = ['id' => $docId];
-        $handler = $this->docsHandler;
+        $handler = $this->docs->getHandler();
 
         if (!$handler) {
             throw new \LogicException('The document handler is not open. Open it with JsonStorage::open().');
@@ -102,7 +98,7 @@ class JsonStorage implements Storage
                 $doc[$name] = $data[$name];
             }
         }
-        $this->save($handler, sprintf('{"id":"%s"', $docId), $doc, $this->docsLineLength, fn (&$data, $lineData) => true);
+        $this->save($this->docs, sprintf('{"id":"%s"', $docId), $doc, fn (&$data, $lineData) => true);
     }
 
     public function getDocuments(array $docIds): array
@@ -119,10 +115,12 @@ class JsonStorage implements Storage
 
     public function loadDocument(string $docId): array
     {
-        $handler = $this->docsHandler;
         $pattern = sprintf('{"id":"%s"', $docId);
 
-        return $this->load($handler, $pattern, $this->docsLineLength);
+        return $this->load(
+            $this->docs,
+            $pattern
+        );
     }
 
     public function saveIndices(string $docId, array $data): void
@@ -139,30 +137,37 @@ class JsonStorage implements Storage
                     $existingDocIds = $this->loadIndex($name, $token);
                     if (!in_array($docId, $existingDocIds)) {
                         $existingDocIds[] = $docId;
-                        $this->saveIndex($this->indexHandlers[$name], $token, $existingDocIds);
+                        $this->saveIndex($this->indices[$name], $token, $existingDocIds);
                     }
                 }
             }
         }
     }
 
-    /**
-     * @param resource $handler
-     * @param string $term
-     * @param string[] $docIds
-     */
-    private function saveIndex($handler, string $term, array $docIds): void
+    public function count(): int
     {
-        if (!$handler) {
+        $this->docs->open(['mode' => 'r']);
+        $lines = $this->docs->getTotalLines();
+        $this->docs->close();
+        return $lines;
+    }
+
+    public function exists(): bool
+    {
+        return $this->docs->isCreated();
+    }
+
+    private function saveIndex(FileIndex $index, string $term, array $docIds): void
+    {
+        if (!$index->getHandler()) {
             throw new \LogicException('The index handler is not open. Open it with JsonStorage::open().');
         }
 
         $this->save(
-            $handler,
+            $index,
             sprintf('{"%s":"%s"', self::KEY, $term),
             [self::KEY => $term, 'ids' => implode(',', $docIds)],
-            $this->indexLineLength,
-            function (&$data, $lineData) use ($docIds) {
+            function (&$data, $lineData) {
                 $line = json_decode($lineData, 1, 512, JSON_THROW_ON_ERROR);
                 $data['ids'] = implode(',', array_unique(array_merge(
                     explode(',', $line['ids']),
@@ -191,9 +196,8 @@ class JsonStorage implements Storage
 
     private function loadIndex(string $name, string $term): array
     {
-        $handler = $this->indexHandlers[$name];
         $pattern = sprintf('{"%s":"%s"', self::KEY, $term);
-        $doc = $this->load($handler, $pattern, $this->indexLineLength);
+        $doc = $this->load($this->indices[$name], $pattern);
         return isset($doc['ids']) ? explode(',', $doc['ids']) : [];
     }
 
@@ -205,102 +209,75 @@ class JsonStorage implements Storage
         return $indices;
     }
 
-
-    public function count(): int
-    {
-        $handler = fopen($this->docsFile, 'r');
-        $lines = $this->lines($handler);
-        fclose($handler);
-        return $lines;
-    }
-
-    /**
-     * @param resource|false $handler
-     */
-    private function load($handler, string $pattern, int $lineLength): array
+    private function load(FileIndex $index, string $pattern): array
     {
         $data = [];
         [$hit, $line] = $this->binarySearch(
-            $handler,
-            $pattern,
-            $lineLength
+            $index,
+            $pattern
         );
 
-        if ($handler && $hit) {
-            fseek($handler, $line * $lineLength);
-            $line = fgets($handler);
+        if ($index->getHandler() && $hit) {
+            $index->moveTo($line * $index->getLength());
+            $line = $index->getLine();
             $data = json_decode($line, true, JSON_THROW_ON_ERROR);
         }
         return $data;
     }
 
-    private function save($handler, string $pattern, array $data, int $lineLength, callable $hitCallback): void
+    private function save(FileIndex $index, string $pattern, array $data, callable $hitCallback): void
     {
-        if (!flock($handler, LOCK_EX)) {
+        if (!flock($index->getHandler(), LOCK_EX)) {
             throw new \LogicException('The handler is lock. Check if there is any other service writing on one of the files.');
         }
 
         // Perform a binary search to find if the term exists
-        [$hit, $line] = $this->binarySearch($handler, $pattern, $lineLength);
-        $offset = $line * $lineLength;
-        fseek($handler, $offset);
-        $lineData = fgets($handler);
+        [$hit, $line] = $this->binarySearch($index, $pattern);
+        $offset = $line * $index->getLength();
+        $index->moveTo($offset);
+        $lineData = $index->getLine();
         $remainingBytes = '';
         if ($hit) {
             $hitCallback($data, $lineData);
         } else {
-            fseek($handler, $offset);
-            $remainingBytes = stream_get_contents($handler);
+            $index->moveTo($offset);
+            $remainingBytes = stream_get_contents($index->getHandler());
         }
 
-        fseek($handler, $offset); // rewind
+        $index->moveTo($offset); // rewind
         $newLine = json_encode($data, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
         fwrite(
-            $handler,
-            str_pad($newLine, $lineLength - 1) . PHP_EOL . $remainingBytes
+            $index->getHandler(),
+            str_pad($newLine, $index->getLength() - 1) . PHP_EOL . $remainingBytes
         );
-        flock($handler, LOCK_UN);
+        flock($index->getHandler(), LOCK_UN);
     }
 
     /**
-     * @param resource $handler
      * @return array{bool, int?}
      */
-    private function binarySearch($handler, string $pattern, int $lineLength): array
+    private function binarySearch(FileIndex $index, string $pattern): array
     {
-        if ($handler) {
-            $low = 0;
-            $high = $this->lines($handler) - 1;
-            while ($low <= $high) {
-                // point to the middle
-                $mid = (int)(($low + $high) / 2);
-                $offset = ($mid) * $lineLength;
-                fseek($handler, $offset);
-                $line = fgets($handler);
+        $low = 0;
+        $high = $index->getTotalLines() - 1;
+        while ($low <= $high) {
+            // point to the middle
+            $mid = (int)(($low + $high) / 2);
+            $offset = ($mid) * $index->getLength();
+            $index->moveTo($offset);
+            $line = $index->getLine();
 
-                // compare
-                $comparison = strcmp(substr($line, 0, strlen($pattern)), $pattern);
-                if ($comparison === 0) {
-                    return [true, $mid]; // Term found
-                } elseif ($comparison < 0) {
-                    $low = $mid + 1; // Search from middle to bottom
-                } else {
-                    $high = $mid - 1; // Search from middle to top
-                }
+            // compare
+            $comparison = strcmp(substr($line, 0, strlen($pattern)), $pattern);
+            if ($comparison === 0) {
+                return [true, $mid]; // Term found
+            } elseif ($comparison < 0) {
+                $low = $mid + 1; // Search from middle to bottom
+            } else {
+                $high = $mid - 1; // Search from middle to top
             }
-            return [false, $low];
         }
-        return [false, null];
-    }
-
-    private function lines($handle): int
-    {
-        $line = 0;
-        fseek($handle, 0);
-        while (!feof($handle) && fgets($handle) !== false) {
-            $line++;
-        }
-        return $line;
+        return [false, $low ?: null];
     }
 
     private function transform(mixed $term): mixed

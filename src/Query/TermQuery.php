@@ -31,4 +31,9 @@ final class TermQuery extends Query implements TextQuery
     {
         return $this->value;
     }
+
+    public function getBoost(): float
+    {
+        return $this->boost;
+    }
 }
