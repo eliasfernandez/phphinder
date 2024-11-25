@@ -9,7 +9,7 @@ use SearchEngine\Utils\StringHelper;
 
 class JsonStorage implements Storage
 {
-    private const int INDEX_LINE_LENGTH_MIN = 128;
+    private const int INDEX_LINE_LENGTH_MIN = 12;
     private const int DOCS_LINE_LENGTH = 256;
     private const string KEY = 'k';
     private FileIndex $docs;
@@ -204,10 +204,45 @@ class JsonStorage implements Storage
         return isset($doc['ids']) ? explode(',', $doc['ids']) : [];
     }
 
+    private function loadPrefixIndices(string $prefix): array
+    {
+        $indices = [];
+
+        $prefix = $this->transform($prefix);
+        if (null === $prefix) {
+            return $indices;
+        }
+
+        $indexedVariables = array_filter($this->schemaVariables, fn(string $var) => $var & Schema::IS_INDEXED);
+        foreach ($indexedVariables as $name => $_) {
+            $indices[$name] = $this->loadPrefixIndex($name, $prefix);
+        }
+
+        return $indices;
+    }
+
+    private function loadPrefixIndex(string $name, string $prefix): array
+    {
+        $pattern = sprintf('{"%s":"%s', self::KEY, $prefix);
+        $ids = [];
+        foreach ($this->loadPrefix($this->indices[$name], $pattern) as $doc) {
+            $ids = array_merge($ids, explode(',', $doc['ids']));
+        }
+        return $ids;
+    }
+
     public function findDocsByIndex(string $term, ?string $index = null): array
     {
         $this->open(['mode' => 'r']);
         $indices = $index ? $this->loadIndex($index, $term) : $this->loadIndices($term);
+        $this->commit();
+        return $indices;
+    }
+
+    public function findDocsByPrefix(string $prefix, ?string $index = null): array
+    {
+        $this->open(['mode' => 'r']);
+        $indices = $index ? $this->loadPrefixIndex($index, $prefix) : $this->loadPrefixIndices($prefix);
         $this->commit();
         return $indices;
     }
@@ -226,6 +261,18 @@ class JsonStorage implements Storage
             $data = json_decode($line, true, JSON_THROW_ON_ERROR);
         }
         return $data;
+    }
+
+    private function loadPrefix(FileIndex $index, string $pattern): \Generator
+    {
+        $results = $this->binarySearchByPrefix(
+            $index,
+            $pattern
+        );
+
+        foreach ($results as $line) {
+            yield json_decode($line, true, JSON_THROW_ON_ERROR);;
+        }
     }
 
     private function save(FileIndex $index, string $pattern, array $data, callable $hitCallback): void
@@ -285,7 +332,7 @@ class JsonStorage implements Storage
             $line = $index->getLine();
 
             // compare
-            $comparison = strcmp(substr($line, 0, strlen($pattern)), $pattern);
+            $comparison = strncmp($line, $pattern, strlen($pattern));
             if ($comparison === 0) {
                 return [true, $mid]; // Term found
             } elseif ($comparison < 0) {
@@ -295,6 +342,48 @@ class JsonStorage implements Storage
             }
         }
         return [false, $low ?: null];
+    }
+
+    private function binarySearchByPrefix(FileIndex $index, string $prefix): array
+    {
+        [$hit, $mid] = $this->binarySearch($index, $prefix);
+        if ($hit) {
+            return $this->collectMatches($index, $mid, $prefix);
+        }
+        return [];
+    }
+
+    private function collectMatches(FileIndex $index, int $start, string $prefix): array
+    {
+        $matches = [];
+        $current = $start;
+        while ($current >= 0) {
+            $offset = $current * $index->getLength();
+            $index->moveTo($offset);
+            $line = $index->getLine();
+
+            if (strncmp($line, $prefix, strlen($prefix)) === 0) {
+                $matches[] = $line;
+            } else {
+                break;
+            }
+            $current--;
+        }
+
+        $current = $start + 1;
+        while ($current < $index->getTotalLines()) {
+            $offset = $current * $index->getLength();
+            $index->moveTo($offset);
+            $line = $index->getLine();
+
+            if (strncmp($line, $prefix, strlen($prefix)) === 0) {
+                $matches[] = $line;
+            } else {
+                break;
+            }
+            $current++;
+        }
+        return $matches;
     }
 
     private function transform(mixed $term): mixed

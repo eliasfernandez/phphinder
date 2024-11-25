@@ -12,7 +12,6 @@ use SearchEngine\Query\QueryParser;
 use SearchEngine\Query\TermQuery;
 use SearchEngine\Query\TextQuery;
 use SearchEngine\Schema\Schema;
-use SearchEngine\Token\Tokenizer;
 use SearchEngine\Utils\ArrayHelper;
 use SearchEngine\Utils\IDEncoder;
 
@@ -28,7 +27,6 @@ class SearchEngine
     public function __construct(
         private readonly Storage $storage,
         private readonly Schema $schema,
-        private readonly Tokenizer $tokenizer,
     ) {
         $this->schemaVariables = (new \ReflectionClass($schema::class))->getDefaultProperties();
     }
@@ -128,7 +126,7 @@ class SearchEngine
     /**
      * @param array<array{id:string}> $docs
      */
-    private function searchTerm(Query $query, array $docs, string $phrase): array
+    private function searchTerm(Query $query, array $docs): array
     {
         $termByIndex = [];
 
@@ -137,40 +135,22 @@ class SearchEngine
             self::ANY_SYMBOL !== $query->getField() ? $query->getField() : null
         );
 
-        foreach ($termByIndex as $term => $indices) {
-            foreach ($indices as $index => $data) {
-                foreach ($data as $key) {
-                    if (!isset($docs[$key])) {
-                        $docs[$key] = [
-                            'indices' => [$index],
-                            'terms' => [],
-                            'fulltext' => false,
-                        ];
-                    }
-                    $docs[$key] = array_merge_recursive(
-                        $docs[$key],
-                        [
-                            'indices' => !in_array($index, $docs[$key]['indices']) ? [$index] : [],
-                            'terms' => [$term],
-                        ]
-                    );
-                }
-            }
-        }
-
-        return ArrayHelper::arrayMergeRecursivePreserveKeys(
-            $docs,
-            $this->storage->getDocuments(array_keys($docs))
-        );
+        return $this->attachDocuments($termByIndex, $docs);
     }
 
     /**
      * @param array<array{id:string}> $docs
-     * @todo
      */
-    private function searchPrefix(Query $query, array $docs, string $phrase): array
+    private function searchPrefix(Query $query, array $docs): array
     {
-        return $docs;
+        $termByIndex = [];
+
+        $termByIndex[$query->getValue()] = $this->storage->findDocsByPrefix(
+            $query->getValue(),
+            self::ANY_SYMBOL !== $query->getField() ? $query->getField() : null
+        );
+
+        return $this->attachDocuments($termByIndex, $docs);
     }
 
     /**
@@ -182,9 +162,9 @@ class SearchEngine
         return match (true) {
             $query instanceof AndQuery => $this->searchAnd($query->getSubqueries(), $docs, $phrase),
             $query instanceof OrQuery => $this->searchOr($query->getSubqueries(), $docs, $phrase),
-            $query instanceof TermQuery => $this->searchTerm($query, $docs, $phrase),
+            $query instanceof TermQuery => $this->searchTerm($query, $docs),
             $query instanceof NotQuery => $this->searchNot($query->getSubquery(), $docs, $phrase),
-            $query instanceof PrefixQuery => $this->searchPrefix($query, $docs, $phrase),
+            $query instanceof PrefixQuery => $this->searchPrefix($query, $docs),
             default => $docs
         };
     }
@@ -268,6 +248,7 @@ class SearchEngine
 
         return $docs;
     }
+
     /**
      * @param array<array{id:string}> $doc
      * @param array<string, array{term: string, boost: float}> $terms
@@ -283,7 +264,6 @@ class SearchEngine
                 $score += $this->boostTermByIndex($terms[self::ANY_SYMBOL], $doc['terms'], $score);
             }
         }
-
 
         if ($doc['fulltext']) {
             $score += 10.0;
@@ -316,5 +296,34 @@ class SearchEngine
             $score += $termsInIndex * $boost / $termsInIndex;
         }
         return $score;
+    }
+
+    private function attachDocuments(array $termByIndex, array $docs): array
+    {
+        foreach ($termByIndex as $term => $indices) {
+            foreach ($indices as $index => $data) {
+                foreach ($data as $key) {
+                    if (!isset($docs[$key])) {
+                        $docs[$key] = [
+                            'indices' => [$index],
+                            'terms' => [],
+                            'fulltext' => false,
+                        ];
+                    }
+                    $docs[$key] = array_merge_recursive(
+                        $docs[$key],
+                        [
+                            'indices' => !in_array($index, $docs[$key]['indices']) ? [$index] : [],
+                            'terms' => [$term],
+                        ]
+                    );
+                }
+            }
+        }
+
+        return ArrayHelper::arrayMergeRecursivePreserveKeys(
+            $docs,
+            $this->storage->getDocuments(array_keys($docs))
+        );
     }
 }

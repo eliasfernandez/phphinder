@@ -29,7 +29,7 @@ class AliceSearchEngineTest extends TestCase
         $tokenizer = new RegexTokenizer();
         $storage = new JsonStorage($path, $schema, $tokenizer);
 
-        $this->engine = new SearchEngine($storage, $schema, $tokenizer);
+        $this->engine = new SearchEngine($storage, $schema);
 
         if (!$storage->exists()) {
             $storage->truncate();
@@ -42,7 +42,7 @@ class AliceSearchEngineTest extends TestCase
                 if ($line % 100 == 0) {
                     $t = microtime(true);
                     $this->engine->flush();
-                    $this->assertLessThan(5., microtime(true) - $t, 'more than 5 seconds to write on ' . $line);
+                    $this->assertLessThan(2., microtime(true) - $t, 'more than 2 seconds to write on ' . $line);
                 }
 
                 $text = trim(fgets($handler));
@@ -74,17 +74,18 @@ class AliceSearchEngineTest extends TestCase
         $results = $this->engine->search($search);
         $diff = microtime(true) - $t;
         $this->assertLessThan($time, $diff, sprintf('more than %s seconds to search %s', $search, $time));
-        //fwrite(STDERR, print_r($diff, TRUE));
         $this->assertCount($matches, $results);
     }
 
     public static function provideSearches(): array
     {
         return [
+            ['Ali*', 0.3, 403],
             ['Mabel', 0.05, 4],
             ['Alice', 0.3, 400],
-            ['said poor Alice', 1., 1],
+            ['said poor Alice', 1.1, 1],
             ['Alice NOT(wonderland)', 0.3, 395],
+            ['Hatter', 0.2, 57],
         ];
     }
 }
