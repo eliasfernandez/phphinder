@@ -17,9 +17,9 @@ use SearchEngine\Utils\IDEncoder;
 
 class SearchEngine
 {
-    private const ANY_SYMBOL = '*';
+    private const string ANY_SYMBOL = '*';
     /**
-     * @var array<array{id:string}>
+     * @var array<array{id: string, fulltext: bool, terms: array, indices: array}>
      */
     private array $documents = [];
     private array $schemaVariables = [];
@@ -32,7 +32,7 @@ class SearchEngine
     }
 
     /**
-     * @param array<string, string> $data
+     * @param array<string, string|int> $data
      */
     public function addDocument(array $data): self
     {
@@ -64,7 +64,7 @@ class SearchEngine
 
     /**
      * @param string $phrase
-     * @return array<array{id:string}>
+     * @return array<array{id:string, fulltext:bool, terms:array, indices:array}>
      */
     public function search(string $phrase): array
     {
@@ -75,7 +75,7 @@ class SearchEngine
 
     /**
      * @param array<Query> $subqueries
-     * @param array<array{id:string}> $docs
+     * @param array<array{id: string, fulltext: bool, terms: array, indices: array}> $docs
      */
     private function searchAnd(array $subqueries, array $docs, string $phrase): array
     {
@@ -91,7 +91,7 @@ class SearchEngine
 
     /**
      * @param array<Query> $subqueries
-     * @param array<array{id:string}> $docs
+     * @param array<array{id: string, fulltext: bool, terms: array, indices: array}> $docs
      */
     private function searchOr(array $subqueries, array $docs, string $phrase): array
     {
@@ -108,7 +108,7 @@ class SearchEngine
     }
 
     /**
-     * @param array<array{id:string}> $docs
+     * @param array<array{id: string, fulltext: bool, terms: array, indices: array}> $docs
      */
     private function searchNot(Query $query, array $docs, string $phrase): array
     {
@@ -124,7 +124,7 @@ class SearchEngine
 
 
     /**
-     * @param array<array{id:string}> $docs
+     * @param array<array{id: string, fulltext: bool, terms: array, indices: array}> $docs
      */
     private function searchTerm(Query $query, array $docs): array
     {
@@ -139,7 +139,7 @@ class SearchEngine
     }
 
     /**
-     * @param array<array{id:string}> $docs
+     * @param array<array{id: string, fulltext: bool, terms: array, indices: array}> $docs
      */
     private function searchPrefix(Query $query, array $docs): array
     {
@@ -154,8 +154,8 @@ class SearchEngine
     }
 
     /**
-     * @param array<array{id:string}> $docs
-     * @return array<array{id:string}>
+     * @param array<array{id: string, fulltext: bool, terms: array, indices: array}> $docs
+     * @return array<array{id:string, fulltext:bool, terms:array, indices:array}>
      */
     private function computeQuery(Query $query, array $docs, string $phrase): array
     {
@@ -195,8 +195,8 @@ class SearchEngine
     }
 
     /**
-     * @param array<array{id:string}> $docs
-     * @return array<array{id:string}>
+     * @param array<array{id: string, fulltext: bool, terms: array, indices: array}> $docs
+     * @return array<array{id:string, fulltext:bool, terms:array, indices:array}>
      */
     private function assignFulltextMatch(array $docs, string $phrase): array
     {
@@ -216,9 +216,9 @@ class SearchEngine
     }
 
     /**
-     * @param array<array{id:string}> $docs
+     * @param array<array{id: string, fulltext: bool, terms: array, indices: array}> $docs
      * @param array<Query> $queries
-     * @return array<array{id:string}>
+     * @return array<array{id:string, fulltext:bool, terms:array, indices:array}>
      */
     private function weight(array $docs, array $queries): array
     {
@@ -239,8 +239,8 @@ class SearchEngine
     }
 
     /**
-     * @param array<array{id:string, weight:float}> $docs
-     * @return array<array{id:string}>
+     * @param array<array{id:string, fulltext: bool, terms: array, indices: array}> $docs
+     * @return array<array{id: string, fulltext: bool, terms: array, indices: array, weight: float}>
      */
     private function sort(array &$docs): array
     {
@@ -250,8 +250,8 @@ class SearchEngine
     }
 
     /**
-     * @param array<array{id:string}> $doc
-     * @param array<string, array{term: string, boost: float}> $terms
+     * @param array{id: string, fulltext: bool, terms: array, indices: array} $doc
+     * @param array<string, array<array{term: string, boost: float}>> $terms
      */
     private function calculateScore(array $doc, array $terms): float
     {
@@ -283,7 +283,11 @@ class SearchEngine
         return array_filter($subqueries, fn($q) => $q instanceof TextQuery);
     }
 
-    private function boostTermByIndex($termsByIndex, $terms, float $score): float
+    /**
+     * @param array<array{term: string, boost: float}> $termsByIndex
+     * @param string[] $terms
+     */
+    private function boostTermByIndex(array $termsByIndex, array $terms, float $score): float
     {
         $indexTerms = [];
         $boost = 0.0;
@@ -298,6 +302,11 @@ class SearchEngine
         return $score;
     }
 
+    /**
+     * @param array<string, array<string, string[]>> $termByIndex
+     * @param array<int|string, array{indices: mixed, terms: mixed, fulltext: bool, document: mixed}> $docs
+     * @return array<int|string, array{indices: mixed, terms: mixed, fulltext: bool, document: mixed}>
+     */
     private function attachDocuments(array $termByIndex, array $docs): array
     {
         foreach ($termByIndex as $term => $indices) {
@@ -320,7 +329,6 @@ class SearchEngine
                 }
             }
         }
-
         return ArrayHelper::arrayMergeRecursivePreserveKeys(
             $docs,
             $this->storage->getDocuments(array_keys($docs))

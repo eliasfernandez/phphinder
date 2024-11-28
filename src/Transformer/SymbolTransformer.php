@@ -7,14 +7,14 @@ use Wamania\Snowball\StemmerFactory;
 
 class SymbolTransformer implements Transformer
 {
-    /** @var Filter[] */
+    use TransformerTrait;
+
+    /** @var array<Filter> */
     private array $filters=[];
 
-    public function __construct($langIso = 'en', string ...$filters)
+    public function __construct(string $langIso = 'en', string ...$filters)
     {
-        foreach ($filters as $filter) {
-            $this->filters []= new $filter($langIso);
-        }
+        $this->loadFilters($filters, $langIso);
     }
     public function apply(string $term): ?string
     {

@@ -9,7 +9,8 @@ use SearchEngine\Utils\IDEncoder;
 
 #[CoversClass(IDEncoder::class)]
 class IDEncoderTest extends TestCase {
-    public function testEncode() {
+    public function testEncode(): void
+    {
         $this->assertEquals('0', IDEncoder::encode(0));
         $this->assertEquals('1', IDEncoder::encode(1));
         $this->assertEquals('10', IDEncoder::encode(62));
@@ -17,7 +18,8 @@ class IDEncoderTest extends TestCase {
         $this->assertEquals('100', IDEncoder::encode(3844));
     }
 
-    public function testDecode() {
+    public function testDecode(): void
+    {
         $this->assertEquals(0, IDEncoder::decode('0'));
         $this->assertEquals(1, IDEncoder::decode('1'));
         $this->assertEquals(62, IDEncoder::decode('10'));
@@ -25,7 +27,8 @@ class IDEncoderTest extends TestCase {
         $this->assertEquals(3844, IDEncoder::decode('100'));
     }
 
-    public function testEncodeDecodeConsistency() {
+    public function testEncodeDecodeConsistency(): void
+    {
         $numbers = [0, 1, 61, 62, 123, 3844, 99999];
         foreach ($numbers as $number) {
             $encoded = IDEncoder::encode($number);
@@ -34,14 +37,16 @@ class IDEncoderTest extends TestCase {
         }
     }
 
-    public function testCompare() {
+    public function testCompare(): void
+    {
         $this->assertLessThan(0, IDEncoder::compare('0', '1'));
         $this->assertGreaterThan(0, IDEncoder::compare('10', '1'));
         $this->assertEquals(0, IDEncoder::compare('Z', 'Z'));
         $this->assertLessThan(0, IDEncoder::compare('Z', '100'));
     }
 
-    public function testSortingWithCompare() {
+    public function testSortingWithCompare(): void
+    {
         $encodedIds = ['Z', '1', '100', '10'];
         usort($encodedIds, [IDEncoder::class, 'compare']);
 

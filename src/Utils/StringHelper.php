@@ -3,9 +3,13 @@
 namespace SearchEngine\Utils;
 
 class StringHelper {
-    public static function getShortClass(string $className, $separator = '_'): string
+    public static function getShortClass(string $className, string $separator = '_'): string
     {
         $className = substr($className, strrpos($className, '\\') + 1);
-        return strtolower(implode($separator, preg_split('/(?<=[a-z])(?=[A-Z])/u', $className)));
+        $simplified = preg_split('/(?<=[a-z])(?=[A-Z])/u', $className);
+        if (!is_array($simplified)) {
+            throw new \InvalidArgumentException('Class name could not be parsed: ' . $className);
+        }
+        return strtolower(implode($separator, $simplified));
     }
 }

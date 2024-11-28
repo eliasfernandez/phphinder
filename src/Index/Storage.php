@@ -11,8 +11,8 @@ interface Storage
     public function saveDocument(string $docId, array $data): void;
 
     /**
-     * @return array{id: string, ...<string, string>}
-     * @param array<string> $docIds
+     * @return array{id: string, fulltext: bool, terms: array, indices: array}
+     * @param array<string|int> $docIds
      */
     public function getDocuments(array $docIds): array;
     public function saveIndices(string $docId, array $data): void;

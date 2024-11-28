@@ -23,7 +23,7 @@ class QueryParserTest extends TestCase
         $this->parser = new QueryParser('*');
     }
 
-    public function testParseSimpleAndQuery()
+    public function testParseSimpleAndQuery(): void
     {
         $query = $this->parser->parse("hello world fun");
         $expected = new AndQuery([
@@ -35,7 +35,7 @@ class QueryParserTest extends TestCase
         $this->assertEquals($expected, $query);
     }
 
-    public function testParseOrWithFieldsQuery()
+    public function testParseOrWithFieldsQuery(): void
     {
         $query = $this->parser->parse("hello OR (title:world keyword:fun)");
         $expected = new OrQuery([
@@ -59,7 +59,7 @@ class QueryParserTest extends TestCase
         $this->assertEquals($expected, $query);
     }
 
-    public function testParsePrefixQuery()
+    public function testParsePrefixQuery(): void
     {
         $query = $this->parser->parse("rend*");
         $expected = new PrefixQuery("*", "rend");
@@ -67,7 +67,7 @@ class QueryParserTest extends TestCase
         $this->assertEquals($expected, $query);
     }
 
-    public function testParseMixedComplexQuery()
+    public function testParseMixedComplexQuery(): void
     {
         $query = $this->parser->parse("title:hello (world OR other:foo*)");
         $expected = new AndQuery([
@@ -81,7 +81,7 @@ class QueryParserTest extends TestCase
         $this->assertEquals($expected, $query);
     }
 
-    public function testParseEmptyString()
+    public function testParseEmptyString(): void
     {
         $query = $this->parser->parse("");
         $expected = new NullQuery();
@@ -89,7 +89,7 @@ class QueryParserTest extends TestCase
         $this->assertEquals($expected, $query);
     }
 
-    public function testParseSimpleNotQuery()
+    public function testParseSimpleNotQuery(): void
     {
         $query = $this->parser->parse("hello NOT(world)");
         $expected = new AndQuery([
@@ -100,7 +100,7 @@ class QueryParserTest extends TestCase
         $this->assertEquals($expected, $query);
     }
 
-    public function testParseSimpleNotAtFirstQuery()
+    public function testParseSimpleNotAtFirstQuery(): void
     {
         $query = $this->parser->parse("NOT(world) hello ");
         $expected = new AndQuery([
@@ -110,7 +110,7 @@ class QueryParserTest extends TestCase
 
         $this->assertEquals($expected, $query);
     }
-    public function testParseComplexNotQuery()
+    public function testParseComplexNotQuery(): void
     {
         $query = $this->parser->parse("title:hello NOT(world OR other:foo*)");
         $expected = new AndQuery([
@@ -126,7 +126,7 @@ class QueryParserTest extends TestCase
         $this->assertEquals($expected, $query);
     }
 
-    public function testParseTypesStringCast()
+    public function testParseTypesStringCast(): void
     {
         $this->assertEquals('(NOT(*:hello) AND *:world)', $this->parser->parse("NOT(hello) world")->toString());
         $this->assertEquals('((*:world OR other:foo*) AND NOT(title:hello))', $this->parser->parse("(world OR other:foo*) AND NOT(title:hello)")->toString());

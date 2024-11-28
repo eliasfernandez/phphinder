@@ -7,15 +7,15 @@ use Wamania\Snowball\StemmerFactory;
 
 class StemmerTransformer implements Transformer
 {
+    use TransformerTrait;
+
     /** @var Filter[] */
     private array $filters=[];
     private Stemmer $stemmer;
 
-    public function __construct($langIso = 'en', string ...$filters)
+    public function __construct(string $langIso = 'en', string ...$filters)
     {
-        foreach ($filters as $filter) {
-            $this->filters []= new $filter($langIso);
-        }
+        $this->loadFilters($filters, $langIso);
         $this->stemmer = StemmerFactory::create($langIso);
     }
     public function apply(string $term): ?string

@@ -34,6 +34,9 @@ class AliceSearchEngineTest extends TestCase
         if (!$storage->exists()) {
             $storage->truncate();
             $handler = fopen(__DIR__ . '/pg11.txt', 'r+');
+            if (!$handler) {
+                throw new \RuntimeException('Unable to open pg11.txt');
+            }
 
             $chapter = 'unknown';
             $line = 0;
@@ -45,7 +48,11 @@ class AliceSearchEngineTest extends TestCase
                     $this->assertLessThan(2., microtime(true) - $t, 'more than 2 seconds to write on ' . $line);
                 }
 
-                $text = trim(fgets($handler));
+                $text = fgets($handler);
+                if ($text === false) {
+                    break;
+                }
+                $text = trim($text);
                 if ($text === '') {
                     continue;
                 }
@@ -77,6 +84,9 @@ class AliceSearchEngineTest extends TestCase
         $this->assertCount($matches, $results);
     }
 
+    /**
+     * @return array<array{string, float, int}>
+     */
     public static function provideSearches(): array
     {
         return [

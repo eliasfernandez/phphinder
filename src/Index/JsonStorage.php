@@ -271,7 +271,7 @@ class JsonStorage implements Storage
         );
 
         foreach ($results as $line) {
-            yield json_decode($line, true, JSON_THROW_ON_ERROR);;
+            yield json_decode($line, true, JSON_THROW_ON_ERROR);
         }
     }
 
@@ -301,7 +301,6 @@ class JsonStorage implements Storage
             $index->moveTo(0);
             $fileLines = explode(PHP_EOL, stream_get_contents($index->getHandler()));
             $index->moveTo(0);
-            $i=0;
             foreach ($fileLines as $fileLine) {
                 if ($fileLine === '') {
                     continue;

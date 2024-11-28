@@ -11,6 +11,8 @@ use PHPUnit\Framework\TestCase;
 #[CoversClass(StopWordsFilter::class)]
 class StopWordsFilterTest extends TestCase
 {
+    private StopWordsFilter $filter;
+
     public function setUp(): void
     {
         parent::setUp();
@@ -19,7 +21,7 @@ class StopWordsFilterTest extends TestCase
 
     #[DataProvider('provideStopWords')]
     #[TestDox('Filtering $original results in $expected')]
-    public function testTransform($original, $expected): void
+    public function testTransform(string $original, bool $expected): void
     {
         $this->assertSame($expected, $this->filter->allow($original));
     }
@@ -32,6 +34,9 @@ class StopWordsFilterTest extends TestCase
         $this->assertSame(true, $filter->allow('a'));
     }
 
+    /**
+     * @return array<array{string, bool}>
+     */
     public static function provideStopWords(): array
     {
         return [

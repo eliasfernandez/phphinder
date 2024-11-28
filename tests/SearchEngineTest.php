@@ -27,7 +27,7 @@ class SearchEngineTest extends TestCase
         $storage = new JsonStorage($path, $schema, $tokenizer);
         $storage->truncate();
 
-        $this->engine = new SearchEngine($storage, $schema, $tokenizer);
+        $this->engine = new SearchEngine($storage, $schema);
         $this->engine->addDocument([
             'title' => 'hi!',
             'text' => "hello world! This is a PHP search engine.",
@@ -48,7 +48,6 @@ class SearchEngineTest extends TestCase
     public function testSearchAnd(): void
     {
         $results = $this->engine->search('hello world');
-        $this->assertIsArray($results);
         $this->assertCount(3, $results);
         $this->assertCount(2, $results[1]['terms']);
         $this->assertCount(2, $results[1]['indices']);
@@ -58,7 +57,6 @@ class SearchEngineTest extends TestCase
     public function testSearchOr(): void
     {
         $results = $this->engine->search('hello OR world');
-        $this->assertIsArray($results);
         $this->assertCount(3, $results);
         $this->assertCount(2, $results[1]['terms']);
         $this->assertCount(2, $results[2]['terms']);
@@ -70,7 +68,6 @@ class SearchEngineTest extends TestCase
     public function testSearchParentheses(): void
     {
         $results = $this->engine->search('(hello world) OR fun');
-        $this->assertIsArray($results);
         $this->assertCount(3, $results);
         $this->assertCount(2, $results[1]['terms']);
         $this->assertCount(2, $results[2]['terms']);
@@ -83,7 +80,6 @@ class SearchEngineTest extends TestCase
     {
         $results = $this->engine->search('hello NOT(engine)');
 
-        $this->assertIsArray($results);
         $this->assertCount(1, $results);
         $this->assertCount(1, $results[0]['terms']);
         $this->assertCount(1, $results[0]['indices']);
@@ -93,7 +89,6 @@ class SearchEngineTest extends TestCase
     public function testSearchNotAtFirst(): void
     {
         $results = $this->engine->search('NOT(engine) hello');
-        $this->assertIsArray($results);
         $this->assertCount(1, $results);
         $this->assertCount(1, $results[0]['terms']);
         $this->assertCount(1, $results[0]['indices']);
@@ -135,7 +130,6 @@ class SearchEngineTest extends TestCase
     public function testSortedResults(): void
     {
         $results = $this->engine->search('hello world');
-        $this->assertIsArray($results);
         $this->assertCount(3, $results);
         $this->assertCount(2, $results[1]['terms']);
         $this->assertCount(1, $results[2]['indices']);

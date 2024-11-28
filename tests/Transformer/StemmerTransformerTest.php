@@ -12,6 +12,8 @@ use SearchEngine\Transformer\StemmerTransformer;
 #[CoversClass(StemmerTransformer::class)]
 class StemmerTransformerTest extends TestCase
 {
+    private StemmerTransformer $transformer;
+
     public function setUp(): void
     {
         parent::setUp();
@@ -20,11 +22,14 @@ class StemmerTransformerTest extends TestCase
 
     #[DataProvider('provideStemmableWords')]
     #[TestDox('Converting $original results in $expected')]
-    public function testTransform($original, $expected): void
+    public function testTransform(string $original, string $expected): void
     {
         $this->assertSame($expected, $this->transformer->apply($original));
     }
 
+    /**
+     * @return array<array{string, string}>
+     */
     public static function provideStemmableWords(): array
     {
         return [
