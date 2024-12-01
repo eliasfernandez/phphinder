@@ -2,9 +2,9 @@
 
 namespace SearchEngine\Query;
 
-final class NotQuery extends Query
+final class NotQuery extends GroupQuery
 {
-    // We want NOT query to be executed at last
+    // NOT query is the last executed
     protected int $priority = 1;
 
     public function __construct(

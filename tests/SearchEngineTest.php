@@ -49,31 +49,31 @@ class SearchEngineTest extends TestCase
     {
         $results = $this->engine->search('hello world');
         $this->assertCount(3, $results);
-        $this->assertCount(2, $results[1]['terms']);
-        $this->assertCount(2, $results[1]['indices']);
-        $this->assertTrue($results[0]['fulltext']);
+        $this->assertCount(2, $results[1]->getTerms());
+        $this->assertCount(2, $results[1]->getIndices());
+        $this->assertTrue($results[0]->isFulltext());
     }
 
     public function testSearchOr(): void
     {
         $results = $this->engine->search('hello OR world');
         $this->assertCount(3, $results);
-        $this->assertCount(2, $results[1]['terms']);
-        $this->assertCount(2, $results[2]['terms']);
-        $this->assertCount(1, $results[1]['indices']);
-        $this->assertFalse($results[1]['fulltext']);
-        $this->assertFalse($results[2]['fulltext']);
+        $this->assertCount(2, $results[1]->getTerms());
+        $this->assertCount(2, $results[2]->getTerms());
+        $this->assertCount(1, $results[1]->getIndices());
+        $this->assertFalse($results[1]->isFulltext());
+        $this->assertFalse($results[2]->isFulltext());
     }
 
     public function testSearchParentheses(): void
     {
         $results = $this->engine->search('(hello world) OR fun');
         $this->assertCount(3, $results);
-        $this->assertCount(2, $results[1]['terms']);
-        $this->assertCount(2, $results[2]['terms']);
-        $this->assertCount(1, $results[0]['indices']);
-        $this->assertFalse($results[0]['fulltext']);
-        $this->assertFalse($results[1]['fulltext']);
+        $this->assertCount(2, $results[1]->getTerms());
+        $this->assertCount(2, $results[2]->getTerms());
+        $this->assertCount(1, $results[0]->getIndices());
+        $this->assertFalse($results[0]->isFulltext());
+        $this->assertFalse($results[1]->isFulltext());
     }
 
     public function testSearchNot(): void
@@ -81,18 +81,18 @@ class SearchEngineTest extends TestCase
         $results = $this->engine->search('hello NOT(engine)');
 
         $this->assertCount(1, $results);
-        $this->assertCount(1, $results[0]['terms']);
-        $this->assertCount(1, $results[0]['indices']);
-        $this->assertFalse($results[0]['fulltext']);
+        $this->assertCount(1, $results[0]->getTerms());
+        $this->assertCount(1, $results[0]->getIndices());
+        $this->assertFalse($results[0]->isFulltext());
     }
 
     public function testSearchNotAtFirst(): void
     {
         $results = $this->engine->search('NOT(engine) hello');
         $this->assertCount(1, $results);
-        $this->assertCount(1, $results[0]['terms']);
-        $this->assertCount(1, $results[0]['indices']);
-        $this->assertFalse($results[0]['fulltext']);
+        $this->assertCount(1, $results[0]->getTerms());
+        $this->assertCount(1, $results[0]->getIndices());
+        $this->assertFalse($results[0]->isFulltext());
     }
 
     public function testFindDocsByIndex(): void
@@ -131,8 +131,8 @@ class SearchEngineTest extends TestCase
     {
         $results = $this->engine->search('hello world');
         $this->assertCount(3, $results);
-        $this->assertCount(2, $results[1]['terms']);
-        $this->assertCount(1, $results[2]['indices']);
-        $this->assertTrue($results[0]['fulltext']);
+        $this->assertCount(2, $results[1]->getTerms());
+        $this->assertCount(1, $results[2]->getIndices());
+        $this->assertTrue($results[0]->isFulltext());
     }
 }

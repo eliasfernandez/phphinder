@@ -9,9 +9,9 @@ use SearchEngine\Utils\StringHelper;
 
 class JsonStorage implements Storage
 {
-    private const int INDEX_LINE_LENGTH_MIN = 12;
-    private const int DOCS_LINE_LENGTH = 256;
-    private const string KEY = 'k';
+    private const INDEX_LINE_LENGTH_MIN = 12;
+    private const DOCS_LINE_LENGTH = 256;
+    private const KEY = 'k';
     private FileIndex $docs;
     /** @var array<string, FileIndex> */
     private array $indices;
@@ -104,17 +104,15 @@ class JsonStorage implements Storage
         $this->save($this->docs, sprintf('{"id":"%s"', $docId), $doc, fn (&$data, $lineData) => true);
     }
 
-    public function getDocuments(array $docIds): array
+    public function getDocuments(array $docIds): \Generator
     {
         $this->open(['mode' => 'r']);
-        $docs = [];
         foreach ($docIds as $docId) {
-            $docs[$docId] = ['document' => $this->loadDocument($docId)];
+            yield [$docId, $this->loadDocument($docId)];
         }
         $this->commit();
-
-        return $docs;
     }
+
 
     public function loadDocument(string $docId): array
     {
@@ -231,7 +229,7 @@ class JsonStorage implements Storage
         return $ids;
     }
 
-    public function findDocsByIndex(string $term, ?string $index = null): array
+    public function findDocIdsByIndex(string $term, ?string $index = null): array
     {
         $this->open(['mode' => 'r']);
         $indices = $index ? $this->loadIndex($index, $term) : $this->loadIndices($term);
@@ -239,7 +237,10 @@ class JsonStorage implements Storage
         return $indices;
     }
 
-    public function findDocsByPrefix(string $prefix, ?string $index = null): array
+    /**
+     * @return array<string, array<string, string[]>>
+     */
+    public function findDocIdsByPrefix(string $prefix, ?string $index = null): array
     {
         $this->open(['mode' => 'r']);
         $indices = $index ? $this->loadPrefixIndex($index, $prefix) : $this->loadPrefixIndices($prefix);
@@ -260,6 +261,7 @@ class JsonStorage implements Storage
             $line = $index->getLine();
             $data = json_decode($line, true, JSON_THROW_ON_ERROR);
         }
+
         return $data;
     }
 
@@ -294,21 +296,9 @@ class JsonStorage implements Storage
             $remainingBytes = stream_get_contents($index->getHandler());
         }
 
-
         $newLine = json_encode($data, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
-        if (strlen($newLine) + 1 > $index->getLength()) { // recalculate index length
-            $newLength = $this->getNewLength(strlen($newLine) + 1, $index);
-            $index->moveTo(0);
-            $fileLines = explode(PHP_EOL, stream_get_contents($index->getHandler()));
-            $index->moveTo(0);
-            foreach ($fileLines as $fileLine) {
-                if ($fileLine === '') {
-                    continue;
-                }
-                $index->write(str_pad($fileLine, $newLength - 1) . PHP_EOL);
-            }
-            $index->setLength($newLength);
-            $offset = $line * $index->getLength();
+        if (strlen($newLine) + 1 > $index->getLength()) {
+            $offset = $this->recalculateIndexLength($newLine, $index, $line);
         }
         $index->moveTo($offset); // rewind
 
@@ -317,7 +307,7 @@ class JsonStorage implements Storage
     }
 
     /**
-     * @return array{bool, int?}
+     * @return array{bool, int}
      */
     private function binarySearch(FileIndex $index, string $pattern): array
     {
@@ -340,7 +330,8 @@ class JsonStorage implements Storage
                 $high = $mid - 1; // Search from middle to top
             }
         }
-        return [false, $low ?: null];
+
+        return [false, $low];
     }
 
     private function binarySearchByPrefix(FileIndex $index, string $prefix): array
@@ -397,10 +388,26 @@ class JsonStorage implements Storage
         return $term;
     }
 
-    private function getNewLength(int $length, FileIndex $index): int
+    private function recalculateIndexLength(string $newLine, FileIndex $index, int $line): int
     {
-        $multiplier = ceil($length / self::INDEX_LINE_LENGTH_MIN);
-        $newLength = intval(self::INDEX_LINE_LENGTH_MIN * $multiplier);
-        return $newLength;
+        $newLength = $this->getNewLength(strlen($newLine) + 1);
+        $index->moveTo(0);
+        $fileLines = explode(PHP_EOL, stream_get_contents($index->getHandler()));
+        $index->moveTo(0);
+        foreach ($fileLines as $fileLine) {
+            if ($fileLine === '') {
+                continue;
+            }
+
+            $index->write(str_pad($fileLine, $newLength - 1) . PHP_EOL);
+        }
+        $index->setLength($newLength);
+        return $line * $newLength;
+    }
+
+    private function getNewLength(int $length): int
+    {
+        $multiplier = 1 + ceil($length / self::INDEX_LINE_LENGTH_MIN);
+        return intval(self::INDEX_LINE_LENGTH_MIN * $multiplier);
     }
 }

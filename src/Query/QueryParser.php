@@ -24,21 +24,31 @@ class QueryParser
     public function parse(string $text): Query
     {
         $tokens = $this->tokenize($text);
-        $query = $this->parseTokens($tokens);
-        return $query;
+        return $this->parseTokens($tokens);
     }
 
+    /**
+     * @return array<string>
+     */
     private function tokenize(string $query): array
     {
-        // Split the query into tokens: whitespace, operators, parentheses, field:value, etc.
+        if ('' === trim($query)) {
+            return [];
+        }
         $tokens =  preg_split('/(\s+|OR|NOT\(|AND|\(|\)|\w+\*|\w+:\w+\*|\w+:\w+)/', $query, -1, PREG_SPLIT_NO_EMPTY | PREG_SPLIT_DELIM_CAPTURE);
+        if (!$tokens) {
+            throw new \LogicException('Something went wrong trying to tokenize the query');
+        }
         return array_values(array_filter($tokens, fn ($token) => trim($token) !== '' && trim($token) !== 'AND'));
     }
 
-    private function parseTokens(array &$tokens, &$pointer = 0): Query
+    /**
+     * @param array<string> $tokens
+     */
+    private function parseTokens(array &$tokens, int &$pointer = 0): Query
     {
         if (count($tokens) === 0) {
-            return new NullQuery();
+            return new NullQuery('Empty Query');
         }
         $operatorStack = [];
         $subqueries = [];
@@ -49,7 +59,7 @@ class QueryParser
                 $originalPointer = $pointer;
                 $pointer++;
                 $subquery = $this->parseTokens($tokens, $pointer);
-                $subqueries[] = $token === 'NOT(' ? new NotQuery($subquery): $subquery;
+                $subqueries[] = $token === 'NOT(' ? new NotQuery($subquery) : $subquery;
                 $tokens = array_merge(
                     array_slice($tokens, 0, $originalPointer),
                     array_slice($tokens, $pointer + 1),

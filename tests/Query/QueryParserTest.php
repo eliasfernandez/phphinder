@@ -2,6 +2,7 @@
 
 namespace Tests\Query;
 
+use Couchbase\QueryException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use SearchEngine\Query\AndQuery;
@@ -84,7 +85,7 @@ class QueryParserTest extends TestCase
     public function testParseEmptyString(): void
     {
         $query = $this->parser->parse("");
-        $expected = new NullQuery();
+        $expected = new NullQuery('Empty Query');
 
         $this->assertEquals($expected, $query);
     }
@@ -131,7 +132,7 @@ class QueryParserTest extends TestCase
         $this->assertEquals('(NOT(*:hello) AND *:world)', $this->parser->parse("NOT(hello) world")->toString());
         $this->assertEquals('((*:world OR other:foo*) AND NOT(title:hello))', $this->parser->parse("(world OR other:foo*) AND NOT(title:hello)")->toString());
 
-        $this->assertEquals('<null>', $this->parser->parse(""));
+        $this->assertEquals('<null> Empty Query', $this->parser->parse("")->toString());
         $this->assertEquals('*:hello', $this->parser->parse("hello"));
         $this->assertEquals('(*:hello AND *:world)', $this->parser->parse("hello world"));
         $this->assertEquals('(title:hello AND (*:world OR other:foo*))', $this->parser->parse("title:hello (world OR other:foo*)"));
@@ -152,7 +153,7 @@ class QueryParserTest extends TestCase
                     )
                 )
             )
-            QUERY)->toString());
-
+            QUERY
+        )->toString());
     }
 }

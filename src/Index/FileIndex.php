@@ -6,7 +6,7 @@ class FileIndex
 {
     /** @var resource $handler */
     private $handler;
-    public function __construct(private string $path, private ?int $lineLength = null)
+    public function __construct(private readonly string $path, private int $lineLength = 0)
     {
     }
 
