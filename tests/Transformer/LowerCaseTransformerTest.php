@@ -5,7 +5,7 @@ namespace Tests\Transformer;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestDox;
-use SearchEngine\Transformer\LowerCaseTransformer;
+use PHPhinder\Transformer\LowerCaseTransformer;
 use PHPUnit\Framework\TestCase;
 
 #[CoversClass(LowerCaseTransformer::class)]

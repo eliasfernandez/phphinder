@@ -9,7 +9,7 @@
  * file that was distributed with this source code.
  */ 
 
-namespace SearchEngine\Index;
+namespace PHPhinder\Index;
 
 class FileIndex
 {

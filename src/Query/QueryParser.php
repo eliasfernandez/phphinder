@@ -9,9 +9,9 @@
  * file that was distributed with this source code.
  */
 
-namespace SearchEngine\Query;
+namespace PHPhinder\Query;
 
-use SearchEngine\Schema\Schema;
+use PHPhinder\Schema\Schema;
 
 class QueryParser
 {

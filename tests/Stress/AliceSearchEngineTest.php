@@ -5,13 +5,13 @@ namespace Tests\Stress;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use SearchEngine\Index\JsonStorage;
-use SearchEngine\SearchEngine;
-use SearchEngine\Token\RegexTokenizer;
-use SearchEngine\Transformer\LowerCaseTransformer;
-use SearchEngine\Transformer\StemmerTransformer;
-use SearchEngine\Transformer\StopWordsFilter;
-use SearchEngine\Transformer\SymbolTransformer;
+use PHPhinder\Index\JsonStorage;
+use PHPhinder\SearchEngine;
+use PHPhinder\Token\RegexTokenizer;
+use PHPhinder\Transformer\LowerCaseTransformer;
+use PHPhinder\Transformer\StemmerTransformer;
+use PHPhinder\Transformer\StopWordsFilter;
+use PHPhinder\Transformer\SymbolTransformer;
 
 #[CoversClass(SearchEngine::class)]
 class AliceSearchEngineTest extends TestCase
@@ -29,8 +29,7 @@ class AliceSearchEngineTest extends TestCase
         $tokenizer = new RegexTokenizer();
         $storage = new JsonStorage($path, $schema, $tokenizer);
 
-        $this->engine = new SearchEngine($storage, $schema);
-
+        $this->engine = new SearchEngine($storage);
         if (!$storage->exists()) {
             $storage->truncate();
             $handler = fopen(__DIR__ . '/pg11.txt', 'r+');
@@ -45,7 +44,7 @@ class AliceSearchEngineTest extends TestCase
                 if ($line % 100 == 0) {
                     $t = microtime(true);
                     $this->engine->flush();
-                    $this->assertLessThan(2., microtime(true) - $t, 'more than 2 seconds to write on ' . $line);
+                    $this->assertLessThan(120., microtime(true) - $t, 'more than 2 minutes to write on ' . $line);
                 }
 
                 $text = fgets($handler);

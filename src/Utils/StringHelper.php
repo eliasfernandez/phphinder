@@ -9,7 +9,7 @@
  * file that was distributed with this source code.
  */
 
-namespace SearchEngine\Utils;
+namespace PHPhinder\Utils;
 
 class StringHelper {
     public static function getShortClass(string $className, string $separator = '_'): string

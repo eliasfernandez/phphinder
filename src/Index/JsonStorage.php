@@ -9,12 +9,14 @@
  * file that was distributed with this source code.
  */
 
-namespace SearchEngine\Index;
+namespace PHPhinder\Index;
 
-use SearchEngine\Schema\Schema;
-use SearchEngine\Transformer\Transformer;
-use SearchEngine\Token\Tokenizer;
-use SearchEngine\Utils\StringHelper;
+use PHPhinder\Schema\DefaultSchema;
+use PHPhinder\Schema\Schema;
+use PHPhinder\Token\RegexTokenizer;
+use PHPhinder\Transformer\Transformer;
+use PHPhinder\Token\Tokenizer;
+use PHPhinder\Utils\StringHelper;
 
 class JsonStorage implements Storage
 {
@@ -24,13 +26,14 @@ class JsonStorage implements Storage
     private FileIndex $docs;
     /** @var array<string, FileIndex> */
     private array $indices;
+
     /** @var array<string, int>  */
     private array $schemaVariables;
 
     public function __construct(
         string $path,
-        private readonly Schema $schema,
-        private readonly Tokenizer $tokenizer,
+        private readonly Schema $schema = new DefaultSchema(),
+        private ?Tokenizer $tokenizer = null,
         private readonly int $indexLineLength = self::INDEX_LINE_LENGTH_MIN,
         private readonly int $docsLineLength = self::DOCS_LINE_LENGTH
     ) {
@@ -42,6 +45,10 @@ class JsonStorage implements Storage
             if ($value & Schema::IS_INDEXED) {
                 $this->indices[$name] = new FileIndex($path . DIRECTORY_SEPARATOR . sprintf('%s_%s_index.json', StringHelper::getShortClass($schema::class), $name));
             }
+        }
+
+        if (null === $this->tokenizer) {
+            $this->tokenizer = new RegexTokenizer();
         }
     }
 
@@ -167,6 +174,20 @@ class JsonStorage implements Storage
         return $this->docs->isCreated();
     }
 
+
+    public function findDocIdsByIndex(string $term, ?string $index = null): array
+    {
+        $this->open(['mode' => 'r']);
+        $indices = $index ? $this->loadIndex($index, $term) : $this->loadIndices($term);
+        $this->commit();
+        return $indices;
+    }
+
+    public function getSchemaVariables(): array
+    {
+        return $this->schemaVariables;
+    }
+
     private function saveIndex(FileIndex $index, string $term, array $docIds): void
     {
         if (!$index->getHandler()) {
@@ -227,7 +248,6 @@ class JsonStorage implements Storage
 
         return $indices;
     }
-
     private function loadPrefixIndex(string $name, string $prefix): array
     {
         $pattern = sprintf('{"%s":"%s', self::KEY, $prefix);
@@ -236,14 +256,6 @@ class JsonStorage implements Storage
             $ids = array_merge($ids, explode(',', $doc['ids']));
         }
         return $ids;
-    }
-
-    public function findDocIdsByIndex(string $term, ?string $index = null): array
-    {
-        $this->open(['mode' => 'r']);
-        $indices = $index ? $this->loadIndex($index, $term) : $this->loadIndices($term);
-        $this->commit();
-        return $indices;
     }
 
     /**

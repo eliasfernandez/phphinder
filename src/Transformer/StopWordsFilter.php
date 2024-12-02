@@ -9,8 +9,7 @@
  * file that was distributed with this source code.
  */
 
-namespace SearchEngine\Transformer;
-
+namespace PHPhinder\Transformer;
 
 class StopWordsFilter implements Filter
 {

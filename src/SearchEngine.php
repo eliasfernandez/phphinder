@@ -9,36 +9,33 @@
  * file that was distributed with this source code.
  */
 
-namespace SearchEngine;
+namespace PHPhinder;
 
-use SearchEngine\Index\Storage;
-use SearchEngine\Query\AndQuery;
-use SearchEngine\Query\NotQuery;
-use SearchEngine\Query\OrQuery;
-use SearchEngine\Query\PrefixQuery;
-use SearchEngine\Query\Query;
-use SearchEngine\Query\QueryParser;
-use SearchEngine\Query\TermQuery;
-use SearchEngine\Query\TextQuery;
-use SearchEngine\Schema\Schema;
-use SearchEngine\Utils\IDEncoder;
+use PHPhinder\Index\Storage;
+use PHPhinder\Query\AndQuery;
+use PHPhinder\Query\NotQuery;
+use PHPhinder\Query\OrQuery;
+use PHPhinder\Query\PrefixQuery;
+use PHPhinder\Query\Query;
+use PHPhinder\Query\QueryParser;
+use PHPhinder\Query\TermQuery;
+use PHPhinder\Query\TextQuery;
+use PHPhinder\Schema\Schema;
+use PHPhinder\Utils\IDEncoder;
 
 class SearchEngine
 {
-    private const string ANY_SYMBOL = '*';
+    private const ANY_SYMBOL = '*';
     /**
      * @var array<Result>
      */
-    private array $documents = [];
+    private array $results = [];
 
-    /** @var array<string, int>  */
-    private array $schemaVariables;
-
-    public function __construct(
-        private readonly Storage $storage,
-        private readonly Schema $schema,
-    ) {
-        $this->schemaVariables = (new \ReflectionClass($schema::class))->getDefaultProperties();
+    public function __construct(private readonly Storage $storage)
+    {
+        if (!$this->storage->exists()) {
+            $this->storage->initialize();
+        }
     }
 
     /**
@@ -47,9 +44,9 @@ class SearchEngine
     public function addDocument(array $data): self
     {
         $id = IDEncoder::encode(
-            $this->storage->count() + count($this->documents) + 1
+            $this->storage->count() + count($this->results) + 1
         );
-        $this->documents[$id] = new Result($id, $data);
+        $this->results[$id] = new Result($data);
 
         return $this;
     }
@@ -57,12 +54,12 @@ class SearchEngine
     public function flush(): void
     {
         $this->storage->open();
-        foreach ($this->documents as $docId => $result) {
+        foreach ($this->results as $docId => $result) {
             $this->storage->saveDocument($docId, $result->getDocument());
             $this->storage->saveIndices($docId, $result->getDocument());
         }
         $this->storage->commit();
-        $this->documents = [];
+        $this->results = [];
     }
 
     /**
@@ -213,7 +210,7 @@ class SearchEngine
      */
     private function assignFulltextMatch(array $docs, string $phrase): array
     {
-        foreach ($this->schemaVariables as $name => $value) {
+        foreach ($this->storage->getSchemaVariables() as $name => $value) {
             if ($value & Schema::IS_FULLTEXT) {
                 foreach ($docs as $key => $doc) {
                     if (!isset($doc->getDocument()[$name])) {
@@ -325,7 +322,7 @@ class SearchEngine
             foreach ($indices as $index => $data) {
                 foreach ($data as $key) {
                     if (!isset($docs[$key])) {
-                        $docs[$key] = new Result($key);
+                        $docs[$key] = new Result();
                     }
                     $docs[$key]->addTerm($term)->addIndex($index);
                 }

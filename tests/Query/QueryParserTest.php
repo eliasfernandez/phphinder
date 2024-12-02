@@ -5,13 +5,13 @@ namespace Tests\Query;
 use Couchbase\QueryException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use SearchEngine\Query\AndQuery;
-use SearchEngine\Query\NotQuery;
-use SearchEngine\Query\NullQuery;
-use SearchEngine\Query\OrQuery;
-use SearchEngine\Query\PrefixQuery;
-use SearchEngine\Query\QueryParser;
-use SearchEngine\Query\TermQuery;
+use PHPhinder\Query\AndQuery;
+use PHPhinder\Query\NotQuery;
+use PHPhinder\Query\NullQuery;
+use PHPhinder\Query\OrQuery;
+use PHPhinder\Query\PrefixQuery;
+use PHPhinder\Query\QueryParser;
+use PHPhinder\Query\TermQuery;
 use Tests\TestSchema;
 
 #[CoversClass(QueryParser::class)]

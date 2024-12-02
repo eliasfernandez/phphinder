@@ -5,9 +5,9 @@ namespace Tests\Transformer;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestDox;
-use SearchEngine\Transformer\LowerCaseTransformer;
+use PHPhinder\Transformer\LowerCaseTransformer;
 use PHPUnit\Framework\TestCase;
-use SearchEngine\Transformer\StemmerTransformer;
+use PHPhinder\Transformer\StemmerTransformer;
 
 #[CoversClass(StemmerTransformer::class)]
 class StemmerTransformerTest extends TestCase

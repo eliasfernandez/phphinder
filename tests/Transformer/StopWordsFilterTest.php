@@ -5,7 +5,7 @@ namespace Tests\Transformer;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestDox;
-use SearchEngine\Transformer\StopWordsFilter;
+use PHPhinder\Transformer\StopWordsFilter;
 use PHPUnit\Framework\TestCase;
 
 #[CoversClass(StopWordsFilter::class)]

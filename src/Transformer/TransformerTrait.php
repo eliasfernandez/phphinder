@@ -9,7 +9,7 @@
  * file that was distributed with this source code.
  */
 
-namespace SearchEngine\Transformer;
+namespace PHPhinder\Transformer;
 
 trait TransformerTrait
 {

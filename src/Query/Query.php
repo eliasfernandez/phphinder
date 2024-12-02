@@ -9,7 +9,7 @@
  * file that was distributed with this source code.
  */
 
-namespace SearchEngine\Query;
+namespace PHPhinder\Query;
 
 abstract class Query implements \Stringable
 {

@@ -9,9 +9,7 @@
  * file that was distributed with this source code.
  */
 
-namespace SearchEngine\Transformer;
-
-use SearchEngine\SearchEngine;
+namespace PHPhinder\Transformer;
 
 interface Filter
 {

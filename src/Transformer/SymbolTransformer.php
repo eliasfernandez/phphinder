@@ -9,10 +9,7 @@
  * file that was distributed with this source code.
  */
 
-namespace SearchEngine\Transformer;
-
-use Wamania\Snowball\Stemmer\Stemmer;
-use Wamania\Snowball\StemmerFactory;
+namespace PHPhinder\Transformer;
 
 class SymbolTransformer implements Transformer
 {

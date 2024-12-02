@@ -9,7 +9,7 @@
  * file that was distributed with this source code.
  */
 
-namespace SearchEngine\Index;
+namespace PHPhinder\Index;
 
 interface Storage
 {
@@ -78,4 +78,15 @@ interface Storage
      * Count the total number of results.
      */
     public function count(): int;
+
+    /**
+     * @return array<string, int>
+     */
+    public function getSchemaVariables(): array;
+
+
+    /**
+     * Check if the document index exists.
+     */
+    public function exists(): bool;
 }

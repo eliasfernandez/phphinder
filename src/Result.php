@@ -9,7 +9,7 @@
  * file that was distributed with this source code.
  */
 
-namespace SearchEngine;
+namespace PHPhinder;
 
 class Result
 {
@@ -21,16 +21,10 @@ class Result
     private float $weight = 0;
 
     /**
-     * @param string $id
      * @param array<string, string> $document
      */
-    public function __construct(private readonly string $id, private array $document = [])
+    public function __construct(private array $document = [])
     {
-    }
-
-    public function getId(): string
-    {
-        return $this->id;
     }
 
     /**

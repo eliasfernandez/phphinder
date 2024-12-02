@@ -5,7 +5,7 @@ namespace Tests\Utils;
 
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use SearchEngine\Utils\IDEncoder;
+use PHPhinder\Utils\IDEncoder;
 
 #[CoversClass(IDEncoder::class)]
 class IDEncoderTest extends TestCase {

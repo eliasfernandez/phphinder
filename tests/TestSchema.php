@@ -2,8 +2,8 @@
 
 namespace Tests;
 
-use SearchEngine\Schema\Schema;
-use SearchEngine\Schema\SchemaTrait;
+use PHPhinder\Schema\Schema;
+use PHPhinder\Schema\SchemaTrait;
 
 class TestSchema implements Schema
 {

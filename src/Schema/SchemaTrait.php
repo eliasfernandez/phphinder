@@ -9,9 +9,9 @@
  * file that was distributed with this source code.
  */
 
-namespace SearchEngine\Schema;
+namespace PHPhinder\Schema;
 
-use SearchEngine\Transformer\Transformer;
+use PHPhinder\Transformer\Transformer;
 
 trait SchemaTrait
 {

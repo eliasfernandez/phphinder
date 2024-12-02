@@ -1,6 +1,6 @@
 {
-    "name": "eliasfernandez/search-engine",
-    "description": "A basic search engine made with PHP",
+    "name": "eliasfernandez/phphinder",
+    "description": "A PHP powered lightweight search engine",
     "type": "library",
     "require-dev": {
         "phpunit/phpunit": "^11.4",
@@ -9,13 +9,13 @@
     "license": "mit",
     "autoload": {
         "psr-4": {
-            "SearchEngine\\": "src/",
+            "PHPhinder\\": "src/",
             "Tests\\": "tests/"
         }
     },
     "authors": [
         {
-            "name": "Elías Fernández",
+            "name": "Elías Fernández Velázquez",
             "email": "eliasfernandez@gmail.com"
         }
     ],

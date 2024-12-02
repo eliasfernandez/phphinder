@@ -4,12 +4,12 @@ namespace Tests;
 
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use SearchEngine\Index\JsonStorage;
-use SearchEngine\SearchEngine;
-use SearchEngine\Token\RegexTokenizer;
-use SearchEngine\Transformer\LowerCaseTransformer;
-use SearchEngine\Transformer\StemmerTransformer;
-use SearchEngine\Transformer\StopWordsFilter;
+use PHPhinder\Index\JsonStorage;
+use PHPhinder\SearchEngine;
+use PHPhinder\Token\RegexTokenizer;
+use PHPhinder\Transformer\LowerCaseTransformer;
+use PHPhinder\Transformer\StemmerTransformer;
+use PHPhinder\Transformer\StopWordsFilter;
 
 #[CoversClass(SearchEngine::class)]
 class SearchEngineTest extends TestCase
@@ -27,7 +27,7 @@ class SearchEngineTest extends TestCase
         $storage = new JsonStorage($path, $schema, $tokenizer);
         $storage->truncate();
 
-        $this->engine = new SearchEngine($storage, $schema);
+        $this->engine = new SearchEngine($storage);
         $this->engine->addDocument([
             'title' => 'hi!',
             'text' => "hello world! This is a PHP search engine.",
