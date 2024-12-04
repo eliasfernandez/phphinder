@@ -214,7 +214,7 @@ class SearchEngine
             if ($value & Schema::IS_FULLTEXT) {
                 foreach ($docs as $key => $doc) {
                     if (!isset($doc->getDocument()[$name])) {
-                        throw new \LogicException(
+                        throw new \StorageException(
                             sprintf('Field `%s` is declared as fulltext but not stored.', $name)
                         );
                     }

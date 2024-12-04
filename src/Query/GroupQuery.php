@@ -11,6 +11,8 @@
 
 namespace PHPhinder\Query;
 
+use PHPhinder\Exception\QueryException;
+
 class GroupQuery extends Query
 {
     protected array $subqueries = [];
@@ -23,7 +25,7 @@ class GroupQuery extends Query
     {
         foreach ($subqueries as $subquery) {
             if (!($subquery instanceof Query)) {
-                throw new \InvalidArgumentException("Invalid subquery");
+                throw new QueryException(sprintf('Invalid subquery %s', get_class($subquery)));
             }
         }
         $this->subqueries = $subqueries;

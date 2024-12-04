@@ -135,4 +135,18 @@ class SearchEngineTest extends TestCase
         $this->assertCount(1, $results[2]->getIndices());
         $this->assertTrue($results[0]->isFulltext());
     }
+
+    public function testDocumentationExample(): void
+    {
+        $storage = new JsonStorage('var');
+        $engine = new SearchEngine($storage);
+
+        $storage->truncate();
+
+        $engine->addDocument(['_id' => 1, 'title' => 'Hi', 'text' => 'Hello world!']);
+        $engine->flush();
+        $results = $engine->search('Hello');
+        $this->assertEquals(1, $results[1]->getDocument()['_id']);
+        $this->assertEquals('Hi', $results[1]->getDocument()['title']);
+    }
 }

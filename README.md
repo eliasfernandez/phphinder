@@ -49,21 +49,16 @@ use PHPhinder\SearchEngine;
 $storage = new JsonStorage('var');
 $engine = new SearchEngine($storage);
 
-$engine->addDocument(['id' => 1, 'title' => 'Hi', 'text' => 'Hello world!']);
+$engine->addDocument(['_id' => 1, 'title' => 'Hi', 'text' => 'Hello world!']);
 $engine->flush();
 $results = $engine->search('Hello');
-print_r($results);
+print_r($results[1]->getDocument());
 ```
 
 ---
 
 ## Configuration  
-PHPhinder offers several configuration options, including custom analyzers, tokenizers, and more. Refer to the [documentation](docs/configuration.md) for detailed instructions.  
-
----
-
-## Examples  
-Explore more examples in the [examples directory](examples/).  
+PHPhinder offers several configuration options, including custom analyzers, tokenizers, and more. Refer to the [manual](docs/manual.md) for detailed instructions.  
 
 ---
 

@@ -23,6 +23,7 @@ class JsonStorage implements Storage
     private const INDEX_LINE_LENGTH_MIN = 12;
     private const DOCS_LINE_LENGTH = 256;
     private const KEY = 'k';
+    private const ID = 'id';
     private FileIndex $docs;
     /** @var array<string, FileIndex> */
     private array $indices;
@@ -42,6 +43,9 @@ class JsonStorage implements Storage
         $this->schemaVariables = (new \ReflectionClass($schema::class))->getDefaultProperties();
 
         foreach ($this->schemaVariables as $name => $value) {
+            if ($name === self::ID) {
+                throw new \StorageException(sprintf('The schema provided contains a property with the reserved name %s', self::ID));
+            }
             if ($value & Schema::IS_INDEXED) {
                 $this->indices[$name] = new FileIndex($path . DIRECTORY_SEPARATOR . sprintf('%s_%s_index.json', StringHelper::getShortClass($schema::class), $name));
             }
@@ -103,11 +107,11 @@ class JsonStorage implements Storage
         $handler = $this->docs->getHandler();
 
         if (!$handler) {
-            throw new \LogicException('The document handler is not open. Open it with JsonStorage::open().');
+            throw new \StorageException('The document handler is not open. Open it with JsonStorage::open().');
         }
         foreach ($this->schemaVariables as $name => $value) {
             if ($value & Schema::IS_REQUIRED && !isset($data[$name])) {
-                throw new \LogicException(sprintf(
+                throw new \StorageException(sprintf(
                     'No `%s` key provided for doc %s',
                     $name,
                     json_encode($data, JSON_THROW_ON_ERROR)
@@ -117,7 +121,7 @@ class JsonStorage implements Storage
                 $doc[$name] = $data[$name];
             }
         }
-        $this->save($this->docs, sprintf('{"id":"%s"', $docId), $doc, fn (&$data, $lineData) => true);
+        $this->save($this->docs, sprintf('{"%s":"%s"', self::ID, $docId), $doc, fn (&$data, $lineData) => true);
     }
 
     public function getDocuments(array $docIds): \Generator
@@ -132,7 +136,7 @@ class JsonStorage implements Storage
 
     public function loadDocument(string $docId): array
     {
-        $pattern = sprintf('{"id":"%s"', $docId);
+        $pattern = sprintf('{"%s":"%s"', self::ID, $docId);
 
         return $this->load(
             $this->docs,
@@ -191,7 +195,7 @@ class JsonStorage implements Storage
     private function saveIndex(FileIndex $index, string $term, array $docIds): void
     {
         if (!$index->getHandler()) {
-            throw new \LogicException('The index handler is not open. Open it with JsonStorage::open().');
+            throw new \StorageException('The index handler is not open. Open it with JsonStorage::open().');
         }
 
         $this->save(
@@ -301,7 +305,7 @@ class JsonStorage implements Storage
     private function save(FileIndex $index, string $pattern, array $data, callable $hitCallback): void
     {
         if (!flock($index->getHandler(), LOCK_EX)) {
-            throw new \LogicException('The handler is lock. Check if there is any other service writing on one of the files.');
+            throw new \StorageException('The handler is lock. Check if there is any other service writing on one of the files.');
         }
 
         // Perform a binary search to find if the term exists

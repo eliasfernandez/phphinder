@@ -11,6 +11,7 @@
 
 namespace PHPhinder\Query;
 
+use PHPhinder\Exception\QueryException;
 use PHPhinder\Schema\Schema;
 
 class QueryParser
@@ -46,7 +47,7 @@ class QueryParser
         }
         $tokens =  preg_split('/(\s+|OR|NOT\(|AND|\(|\)|\w+\*|\w+:\w+\*|\w+:\w+)/', $query, -1, PREG_SPLIT_NO_EMPTY | PREG_SPLIT_DELIM_CAPTURE);
         if (!$tokens) {
-            throw new \LogicException('Something went wrong trying to tokenize the query');
+            throw new QueryException('Something went wrong trying to tokenize the query');
         }
         return array_values(array_filter($tokens, fn ($token) => trim($token) !== '' && trim($token) !== 'AND'));
     }
