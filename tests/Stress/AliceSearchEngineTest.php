@@ -30,8 +30,7 @@ class AliceSearchEngineTest extends TestCase
         $storage = new JsonStorage($path, $schema, $tokenizer);
 
         $this->engine = new SearchEngine($storage);
-        if (!$storage->exists()) {
-            $storage->truncate();
+        if ($storage->isEmpty()) {
             $handler = fopen(__DIR__ . '/pg11.txt', 'r+');
             if (!$handler) {
                 throw new \RuntimeException('Unable to open pg11.txt');
@@ -44,7 +43,7 @@ class AliceSearchEngineTest extends TestCase
                 if ($line % 100 == 0) {
                     $t = microtime(true);
                     $this->engine->flush();
-                    $this->assertLessThan(120., microtime(true) - $t, 'more than 2 minutes to write on ' . $line);
+                    $this->assertLessThan(20., microtime(true) - $t, 'more than 20 seconds to write on ' . $line);
                 }
 
                 $text = fgets($handler);
@@ -89,12 +88,12 @@ class AliceSearchEngineTest extends TestCase
     public static function provideSearches(): array
     {
         return [
-            ['Ali*', 0.3, 403],
+            ['Ali*', 0.15, 403],
             ['Mabel', 0.05, 4],
-            ['Alice', 0.3, 400],
-            ['said poor Alice', 1.1, 1],
-            ['Alice NOT(wonderland)', 0.3, 395],
-            ['Hatter', 0.2, 57],
+            ['Alice', 0.15, 400],
+            ['said poor Alice', 0.5, 1],
+            ['Alice NOT(wonderland)', 0.15, 395],
+            ['Hatter', 0.05, 57],
         ];
     }
 }

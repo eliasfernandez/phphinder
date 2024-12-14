@@ -25,6 +25,7 @@ interface Storage
 
     /**
      * Open the Storage
+     * @param array<string, string> $opts
      */
     public function open(array $opts = []): void;
 
@@ -35,19 +36,26 @@ interface Storage
 
     /**
      * Saves the document on the Storage.
+     * @param array<string, int|float|bool|string> $data
      */
     public function saveDocument(string $docId, array $data): void;
 
     /**
      * Saves the indices on the Storage.
+     * @param array<string, int|float|bool|string> $data
      */
     public function saveIndices(string $docId, array $data): void;
 
     /**
      * @param array<int|string> $docIds
-     * @return \Generator<string, array>
+     * @return \Generator<array{string|int, array<string, int|float|bool|string>}>
      */
     public function getDocuments(array $docIds): \Generator;
+
+    /**
+     * @return array<string, int|float|bool|string>
+     */
+    public function loadDocument(string $docId): array;
 
     /**
      * Given a term, gets the doc ids by index in the form of an associative array with
@@ -71,11 +79,23 @@ interface Storage
      *     ...,
      *     indexN => [ '1', '2', ... 'Z'],
      * ]
+     *
      * @return array<string, array<string>>
      */
     public function findDocIdsByPrefix(string $prefix, ?string $index = null): array;
+
+
+    /**
+     * Looks for the document id on `index` for the search `term` :
+     *
+     * [ '1', '2', ... 'Z'],
+     * @return array<string>
+     */
+    public function loadIndex(string $name, int|float|bool|string $term): array;
+
     /**
      * Count the total number of results.
+     * (Requires the storage to be open))
      */
     public function count(): int;
 
@@ -89,4 +109,16 @@ interface Storage
      * Check if the document index exists.
      */
     public function exists(): bool;
+
+
+    /**
+     * Check if the document index is empty.
+     */
+    public function isEmpty(): bool;
+
+    /**
+     * @param array<string, int|float|bool|string> $doc
+     * Remove doc relationships from indexed indices
+     */
+    public function removeDocFromIndices(array $doc): void;
 }

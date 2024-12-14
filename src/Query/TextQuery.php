@@ -35,11 +35,6 @@ abstract class TextQuery extends Query
         return $this->boost;
     }
 
-    public function normalize(): self
-    {
-        return $this;
-    }
-
     public function toString(): string
     {
         return "{$this->field}:{$this->value}";

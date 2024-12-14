@@ -11,6 +11,6 @@
 
 namespace PHPhinder\Exception;
 
-class QueryException extends \LogicException
+class FileIndexException extends \LogicException
 {
 }

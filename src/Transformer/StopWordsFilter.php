@@ -32,8 +32,9 @@ class StopWordsFilter implements Filter
      */
     private function loadStopWords(string $langIso): array
     {
-        if (is_file('var' . DIRECTORY_SEPARATOR . 'stopwords' . DIRECTORY_SEPARATOR . $langIso . '.php')) {
-            return require 'var' . DIRECTORY_SEPARATOR . 'stopwords' . DIRECTORY_SEPARATOR . $langIso . '.php';
+        $path = dirname(__FILE__) . '/../../var/stopwords/' . $langIso . '.php';
+        if (is_file($path)) {
+            return require $path;
         }
         return [];
     }

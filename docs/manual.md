@@ -72,6 +72,7 @@ A schema specifies:
 - **`Schema::IS_REQUIRED`**: Ensures the property is present when adding documents.
 - **`Schema::IS_STORED`**: Stores the property in documents for retrieval, even if not searchable.
 - **`Schema::IS_FULLTEXT`**: Enables full-text search for the property.
+- **`Schema::IS_UNIQUE`**: Exists only one of these properties for document. Any new document added with the same value on this propery will override the previous one.
 
 These constants can be combined using the bitwise OR operator (|) to define multiple behaviors for a single property.
 

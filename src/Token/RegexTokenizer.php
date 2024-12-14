@@ -14,10 +14,13 @@ namespace PHPhinder\Token;
 class RegexTokenizer implements Tokenizer
 {
     /**
-     * @return array<string>
+     * @return array<int, mixed>
      */
-    public function apply(string $text): array
+    public function apply(mixed $text): array
     {
+        if (!is_string($text)) {
+            return [$text];
+        }
         $tokens = preg_split('/\W+/u', $text, -1, PREG_SPLIT_NO_EMPTY);
 
         return $tokens ?: [];

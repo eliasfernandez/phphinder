@@ -69,7 +69,7 @@ class QueryParser
                 $originalPointer = $pointer;
                 $pointer++;
                 $subquery = $this->parseTokens($tokens, $pointer);
-                $subqueries[] = $token === 'NOT(' ? new NotQuery($subquery) : $subquery;
+                $subqueries[] = $token === 'NOT(' ? new NotQuery([$subquery]) : $subquery;
                 $tokens = array_merge(
                     array_slice($tokens, 0, $originalPointer),
                     array_slice($tokens, $pointer + 1),

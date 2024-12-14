@@ -11,6 +11,7 @@
 
 namespace PHPhinder;
 
+use PHPhinder\Exception\StorageException;
 use PHPhinder\Index\Storage;
 use PHPhinder\Query\AndQuery;
 use PHPhinder\Query\NotQuery;
@@ -39,14 +40,11 @@ class SearchEngine
     }
 
     /**
-     * @param array<string, string> $data
+     * @param array<string, int|float|bool|string> $data
      */
     public function addDocument(array $data): self
     {
-        $id = IDEncoder::encode(
-            $this->storage->count() + count($this->results) + 1
-        );
-        $this->results[$id] = new Result($data);
+        $this->results[] = new Result($data);
 
         return $this;
     }
@@ -54,7 +52,8 @@ class SearchEngine
     public function flush(): void
     {
         $this->storage->open();
-        foreach ($this->results as $docId => $result) {
+        foreach ($this->results as $result) {
+            $docId = $this->getId($result);
             $this->storage->saveDocument($docId, $result->getDocument());
             $this->storage->saveIndices($docId, $result->getDocument());
         }
@@ -62,6 +61,29 @@ class SearchEngine
         $this->results = [];
     }
 
+    /**
+     * @param array<string, int|float|bool|string> $doc
+     * @return array<string, int|float|bool|string>
+     */
+    private function getUniqueDocument(array $doc): array
+    {
+        foreach ($this->storage->getSchemaVariables() as $variable => $options) {
+            if ($options & Schema::IS_UNIQUE && isset($doc[$variable])) {
+                $docInIndex = $this->storage->loadIndex($variable, $doc[$variable]);
+                $id = current($docInIndex);
+                if ($id === false) {
+                    continue;
+                }
+                return $this->storage->loadDocument($id);
+            }
+        }
+        return[];
+    }
+
+    private function nextId(): string
+    {
+        return IDEncoder::encode($this->storage->count() + 1);
+    }
     /**
      * @return array<string, array<string>>
      */
@@ -157,7 +179,6 @@ class SearchEngine
             $query->getValue(),
             self::ANY_SYMBOL !== $query->getField() ? $query->getField() : null
         );
-
         return $this->attachDocuments($termByIndex, $docs);
     }
 
@@ -210,15 +231,18 @@ class SearchEngine
      */
     private function assignFulltextMatch(array $docs, string $phrase): array
     {
-        foreach ($this->storage->getSchemaVariables() as $name => $value) {
-            if ($value & Schema::IS_FULLTEXT) {
+        foreach ($this->storage->getSchemaVariables() as $name => $options) {
+            if ($options & Schema::IS_FULLTEXT) {
                 foreach ($docs as $key => $doc) {
                     if (!isset($doc->getDocument()[$name])) {
-                        throw new \StorageException(
+                        throw new StorageException(
                             sprintf('Field `%s` is declared as fulltext but not stored.', $name)
                         );
                     }
-                    $docs[$key]->setFulltext(str_contains($doc->getDocument()[$name], $phrase));
+                    if (!is_string($doc->getDocument()[$name])) {
+                        continue;
+                    }
+                    $doc->setFulltext(str_contains($doc->getDocument()[$name], $phrase));
                 }
             }
         }
@@ -334,5 +358,16 @@ class SearchEngine
         }
 
         return $docs;
+    }
+
+    private function getId(Result $result): string
+    {
+        $oldDocument = $this->getUniqueDocument($result->getDocument());
+        if ($oldDocument) {
+            $this->storage->removeDocFromIndices($oldDocument);
+            return (string) $oldDocument['id'];
+        }
+
+        return $this->nextId();
     }
 }

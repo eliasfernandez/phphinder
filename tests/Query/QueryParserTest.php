@@ -95,7 +95,7 @@ class QueryParserTest extends TestCase
         $query = $this->parser->parse("hello NOT(world)");
         $expected = new AndQuery([
             new TermQuery("*", "hello"),
-            new NotQuery(new TermQuery("*", "world"),),
+            new NotQuery([new TermQuery("*", "world")]),
         ]);
 
         $this->assertEquals($expected, $query);
@@ -105,7 +105,7 @@ class QueryParserTest extends TestCase
     {
         $query = $this->parser->parse("NOT(world) hello ");
         $expected = new AndQuery([
-            new NotQuery(new TermQuery("*", "world")),
+            new NotQuery([new TermQuery("*", "world")]),
             new TermQuery("*", "hello"),
         ]);
 
@@ -116,12 +116,12 @@ class QueryParserTest extends TestCase
         $query = $this->parser->parse("title:hello NOT(world OR other:foo*)");
         $expected = new AndQuery([
             new TermQuery("title", "hello"),
-            new NotQuery(
+            new NotQuery([
                 new OrQuery([
                     new TermQuery("*", "world"),
                     new PrefixQuery("other", "foo"),
                 ])
-            ),
+            ]),
         ]);
 
         $this->assertEquals($expected, $query);

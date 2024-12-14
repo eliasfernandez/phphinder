@@ -29,4 +29,9 @@ abstract class Query implements \Stringable
     {
         return $this->priority;
     }
+
+    public function normalize(): self
+    {
+        return $this;
+    }
 }

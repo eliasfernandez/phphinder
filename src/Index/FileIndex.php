@@ -7,18 +7,27 @@
  *
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
- */ 
+ */
 
 namespace PHPhinder\Index;
 
+use PHPhinder\Exception\FileIndexException;
+
 class FileIndex
 {
-    /** @var resource $handler */
-    private $handler;
+    /** @var resource|false $handler */
+    private $handler = false;
+
+    /**
+     * @param int<0, max> $lineLength
+     */
     public function __construct(private readonly string $path, private int $lineLength = 0)
     {
     }
 
+    /**
+     * @param array<string, string> $opts
+     */
     public function open(array $opts = []): void
     {
         $this->handler = fopen($this->path, $opts['mode']);
@@ -26,7 +35,7 @@ class FileIndex
 
     public function close(): void
     {
-        fclose($this->handler);
+        fclose($this->getHandler());
     }
 
     /**
@@ -34,6 +43,9 @@ class FileIndex
      */
     public function getHandler()
     {
+        if ($this->handler === false) {
+            throw new FileIndexException('File index has not been opened.');
+        }
         return $this->handler;
     }
 
@@ -42,11 +54,17 @@ class FileIndex
         return $this->path;
     }
 
-    public function getLength(): ?int
+    /**
+     * @return int<0, max>
+     */
+    public function getLength(): int
     {
         return $this->lineLength;
     }
 
+    /**
+     * @param int<0,max> $lineLength
+     */
     public function setLength(int $lineLength): FileIndex
     {
         $this->lineLength = $lineLength;
@@ -57,7 +75,7 @@ class FileIndex
     public function calculateLength(): void
     {
         $this->moveTo(0);
-        $this->setLength(strlen($this->getLine()));
+        $this->setLength(strlen($this->getLine() ? : ''));
     }
 
     public function isCreated(): bool
@@ -65,11 +83,20 @@ class FileIndex
         return file_exists($this->path);
     }
 
+    public function isEmpty(): bool
+    {
+        return !$this->isCreated() || filesize($this->path) === 0;
+    }
+
+    /**
+     * @return int<0, max>
+     */
     public function getTotalLines(): int
     {
+        $handler = $this->getHandler();
         $lines = 0;
-        fseek($this->handler, 0);
-        while (!feof($this->handler) && fgets($this->handler) !== false) {
+        fseek($handler, 0);
+        while (!feof($handler) && fgets($handler) !== false) {
             $lines++;
         }
         return $lines;
@@ -77,16 +104,26 @@ class FileIndex
 
     public function moveTo(int $offset): void
     {
-        fseek($this->handler, $offset);
+        fseek($this->getHandler(), $offset);
     }
 
     public function getLine(): string|false
     {
-        return fgets($this->handler);
+        return fgets($this->getHandler());
     }
 
     public function write(string $text): void
     {
-        fwrite($this->handler, $text);
+        fwrite($this->getHandler(), $text);
+    }
+
+    public function lock(): bool
+    {
+        return flock($this->getHandler(), LOCK_EX);
+    }
+
+    public function unLock(): bool
+    {
+        return flock($this->getHandler(), LOCK_UN);
     }
 }

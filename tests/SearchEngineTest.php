@@ -29,16 +29,19 @@ class SearchEngineTest extends TestCase
 
         $this->engine = new SearchEngine($storage);
         $this->engine->addDocument([
-            'title' => 'hi!',
-            'text' => "hello world! This is a PHP search engine.",
+            '_id' => 1,
+            'title' => 'Cat animal',
+            'text' => "Meow world! This is a PHP search engine.",
             'description' => 'this is a description'
         ])->addDocument([
-            'title' => 'hello!',
-            'text' => "PHP españa makes web development fun to the world.",
+            '_id' => 2,
+            'title' => 'Dog',
+            'text' => "Bark Bark! PHPhinder makes search development fun to the world.",
             'description' => 'Describe the problems',
         ])->addDocument([
-            'title' => 'hi!',
-            'text' => "hello search! This is the minimal PHP search engine for the world.",
+            '_id' => 3,
+            'title' => 'Snake',
+            'text' => "szee szee! This is the minimal PHP search engine for the animal world.",
             'description' => 'this is a description'
         ]);
 
@@ -47,19 +50,19 @@ class SearchEngineTest extends TestCase
 
     public function testSearchAnd(): void
     {
-        $results = $this->engine->search('hello world');
-        $this->assertCount(3, $results);
+        $results = $this->engine->search('search engine');
+        $this->assertCount(2, $results);
         $this->assertCount(2, $results[1]->getTerms());
-        $this->assertCount(2, $results[1]->getIndices());
+        $this->assertCount(1, $results[1]->getIndices());
         $this->assertTrue($results[0]->isFulltext());
     }
 
     public function testSearchOr(): void
     {
-        $results = $this->engine->search('hello OR world');
+        $results = $this->engine->search('search OR engine');
         $this->assertCount(3, $results);
         $this->assertCount(2, $results[1]->getTerms());
-        $this->assertCount(2, $results[2]->getTerms());
+        $this->assertCount(1, $results[2]->getTerms());
         $this->assertCount(1, $results[1]->getIndices());
         $this->assertFalse($results[1]->isFulltext());
         $this->assertFalse($results[2]->isFulltext());
@@ -67,10 +70,10 @@ class SearchEngineTest extends TestCase
 
     public function testSearchParentheses(): void
     {
-        $results = $this->engine->search('(hello world) OR fun');
+        $results = $this->engine->search('(search engine) OR fun');
         $this->assertCount(3, $results);
         $this->assertCount(2, $results[1]->getTerms());
-        $this->assertCount(2, $results[2]->getTerms());
+        $this->assertCount(1, $results[2]->getTerms());
         $this->assertCount(1, $results[0]->getIndices());
         $this->assertFalse($results[0]->isFulltext());
         $this->assertFalse($results[1]->isFulltext());
@@ -78,7 +81,7 @@ class SearchEngineTest extends TestCase
 
     public function testSearchNot(): void
     {
-        $results = $this->engine->search('hello NOT(engine)');
+        $results = $this->engine->search('world NOT(engine)');
 
         $this->assertCount(1, $results);
         $this->assertCount(1, $results[0]->getTerms());
@@ -88,7 +91,7 @@ class SearchEngineTest extends TestCase
 
     public function testSearchNotAtFirst(): void
     {
-        $results = $this->engine->search('NOT(engine) hello');
+        $results = $this->engine->search('NOT(engine) bark');
         $this->assertCount(1, $results);
         $this->assertCount(1, $results[0]->getTerms());
         $this->assertCount(1, $results[0]->getIndices());
@@ -98,20 +101,19 @@ class SearchEngineTest extends TestCase
     public function testFindDocsByIndex(): void
     {
         $results = $this->engine->findDocsByIndex("php");
-        $this->assertCount(3, $results['text']);
+        $this->assertCount(2, $results['text']);
         $this->assertCount(0, $results['title']);
 
         $results = $this->engine->findDocsByIndex("search");
-        $this->assertCount(2, $results['text']);
+        $this->assertCount(3, $results['text']);
         $this->assertCount(0, $results['title']);
 
         $results = $this->engine->findDocsByIndex("engine");
         $this->assertCount(2, $results['text']);
 
-        $results = $this->engine->findDocsByIndex("HI");
+        $results = $this->engine->findDocsByIndex("cat");
         $this->assertCount(0, $results['text']);
-        $this->assertCount(2, $results['title']);
-
+        $this->assertCount(1, $results['title']);
 
         $results = $this->engine->findDocsByIndex("description");
         $this->assertCount(0, $results['text']);
@@ -129,11 +131,17 @@ class SearchEngineTest extends TestCase
 
     public function testSortedResults(): void
     {
-        $results = $this->engine->search('hello world');
-        $this->assertCount(3, $results);
+        $results = $this->engine->search('animal world');
+
+        $this->assertCount(2, $results);
+        $this->assertCount(2, $results[0]->getTerms());
         $this->assertCount(2, $results[1]->getTerms());
-        $this->assertCount(1, $results[2]->getIndices());
+        $this->assertCount(1, $results[0]->getIndices());
+        $this->assertCount(2, $results[1]->getIndices());
         $this->assertTrue($results[0]->isFulltext());
+        $this->assertFalse($results[1]->isFulltext());
+        $this->assertEquals(16., $results[0]->getWeight());
+        $this->assertEquals(10., $results[1]->getWeight());
     }
 
     public function testDocumentationExample(): void
@@ -146,7 +154,23 @@ class SearchEngineTest extends TestCase
         $engine->addDocument(['_id' => 1, 'title' => 'Hi', 'text' => 'Hello world!']);
         $engine->flush();
         $results = $engine->search('Hello');
-        $this->assertEquals(1, $results[1]->getDocument()['_id']);
         $this->assertEquals('Hi', $results[1]->getDocument()['title']);
+    }
+
+    public function testAddUniqueDocumentsOverridePreviousOne(): void
+    {
+        $this->engine->addDocument([
+            '_id' => 1,
+            'title' => 'Cow',
+            'text' => "Mooh world! This is a PHP search engine.",
+            'description' => 'this is a description'
+        ]);
+        $this->engine->flush();
+
+        $results = $this->engine->search('meow');
+        $this->assertCount(0, $results);
+
+        $results = $this->engine->search('mooh');
+        $this->assertCount(1, $results);
     }
 }

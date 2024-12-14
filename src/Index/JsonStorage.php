@@ -11,6 +11,7 @@
 
 namespace PHPhinder\Index;
 
+use PHPhinder\Exception\StorageException;
 use PHPhinder\Schema\DefaultSchema;
 use PHPhinder\Schema\Schema;
 use PHPhinder\Token\RegexTokenizer;
@@ -28,31 +29,30 @@ class JsonStorage implements Storage
     /** @var array<string, FileIndex> */
     private array $indices;
 
-    /** @var array<string, int>  */
+    /** @var array<string, mixed> $schemaVariables*/
     private array $schemaVariables;
 
     public function __construct(
         string $path,
         private readonly Schema $schema = new DefaultSchema(),
-        private ?Tokenizer $tokenizer = null,
-        private readonly int $indexLineLength = self::INDEX_LINE_LENGTH_MIN,
+        private readonly Tokenizer $tokenizer = new RegexTokenizer(),
         private readonly int $docsLineLength = self::DOCS_LINE_LENGTH
     ) {
 
         $this->docs = new FileIndex($path . DIRECTORY_SEPARATOR . sprintf('%s_docs.json', StringHelper::getShortClass($schema::class)), $this->docsLineLength);
         $this->schemaVariables = (new \ReflectionClass($schema::class))->getDefaultProperties();
 
-        foreach ($this->schemaVariables as $name => $value) {
+        /**
+         * @var string $name
+         * @var int $options
+         */
+        foreach ($this->schemaVariables as $name => $options) {
             if ($name === self::ID) {
-                throw new \StorageException(sprintf('The schema provided contains a property with the reserved name %s', self::ID));
+                throw new StorageException(sprintf('The schema provided contains a property with the reserved name %s', self::ID));
             }
-            if ($value & Schema::IS_INDEXED) {
+            if ($options & Schema::IS_INDEXED) {
                 $this->indices[$name] = new FileIndex($path . DIRECTORY_SEPARATOR . sprintf('%s_%s_index.json', StringHelper::getShortClass($schema::class), $name));
             }
-        }
-
-        if (null === $this->tokenizer) {
-            $this->tokenizer = new RegexTokenizer();
         }
     }
 
@@ -104,20 +104,15 @@ class JsonStorage implements Storage
     public function saveDocument(string $docId, array $data): void
     {
         $doc = ['id' => $docId];
-        $handler = $this->docs->getHandler();
-
-        if (!$handler) {
-            throw new \StorageException('The document handler is not open. Open it with JsonStorage::open().');
-        }
-        foreach ($this->schemaVariables as $name => $value) {
-            if ($value & Schema::IS_REQUIRED && !isset($data[$name])) {
-                throw new \StorageException(sprintf(
+        foreach ($this->schemaVariables as $name => $options) {
+            if ($options & Schema::IS_REQUIRED && !isset($data[$name])) {
+                throw new StorageException(sprintf(
                     'No `%s` key provided for doc %s',
                     $name,
                     json_encode($data, JSON_THROW_ON_ERROR)
                 ));
             }
-            if ($value & Schema::IS_STORED) {
+            if ($options & Schema::IS_STORED && isset($data[$name])) {
                 $doc[$name] = $data[$name];
             }
         }
@@ -134,7 +129,7 @@ class JsonStorage implements Storage
     }
 
 
-    public function loadDocument(string $docId): array
+    public function loadDocument(string|int $docId): array
     {
         $pattern = sprintf('{"%s":"%s"', self::ID, $docId);
 
@@ -146,11 +141,10 @@ class JsonStorage implements Storage
 
     public function saveIndices(string $docId, array $data): void
     {
-        foreach ($this->schemaVariables as $name => $value) {
-            if ($value & Schema::IS_INDEXED) {
+        foreach ($this->schemaVariables as $name => $options) {
+            if ($options & Schema::IS_INDEXED) {
                 $tokens = $this->tokenizer->apply($data[$name]);
                 foreach ($tokens as $token) {
-                    /** @var Transformer $transformer */
                     $token = $this->transform($token);
                     if (null === $token) {
                         continue;
@@ -167,10 +161,7 @@ class JsonStorage implements Storage
 
     public function count(): int
     {
-        $this->docs->open(['mode' => 'r']);
-        $lines = $this->docs->getTotalLines();
-        $this->docs->close();
-        return $lines;
+        return $this->docs->getTotalLines();
     }
 
     public function exists(): bool
@@ -178,11 +169,15 @@ class JsonStorage implements Storage
         return $this->docs->isCreated();
     }
 
+    public function isEmpty(): bool
+    {
+        return $this->docs->isEmpty();
+    }
 
     public function findDocIdsByIndex(string $term, ?string $index = null): array
     {
         $this->open(['mode' => 'r']);
-        $indices = $index ? $this->loadIndex($index, $term) : $this->loadIndices($term);
+        $indices = $index ? [$index => $this->loadIndex($index, $term)] : $this->loadIndices($term);
         $this->commit();
         return $indices;
     }
@@ -192,18 +187,50 @@ class JsonStorage implements Storage
         return $this->schemaVariables;
     }
 
+    /**
+     * @param array<string, int|float|bool|string> $doc
+     */
+    public function removeDocFromIndices(array $doc): void
+    {
+        foreach ($this->schemaVariables as $name => $options) {
+            if ($options & Schema::IS_INDEXED && is_string($doc[$name])) {
+                $tokens = $this->getTokensFor($doc[$name]);
+                foreach ($tokens as $token) {
+                    $pattern = sprintf('{"%s":"%s"', self::KEY, $token);
+
+                     /** @var array{k: string, ids: string} $indexDoc */
+                    $indexDoc = $this->removeDocumentFromToken($this->indices[$name], $pattern, $doc['id']);
+                    if ($indexDoc['ids'] === '') {
+                        $this->remove($this->indices[$name], $pattern);
+                        continue;
+                    }
+
+                    $this->save($this->indices[$name], $pattern, $indexDoc, fn (&$data, $lineData) => true);
+                }
+            }
+        }
+    }
+
+    public function loadIndex(string $name, int|float|bool|string $term): array
+    {
+        $pattern = sprintf('{"%s":"%s"', self::KEY, $term);
+         /** @var array{k: string, ids?: string} $doc */
+        $doc = $this->load($this->indices[$name], $pattern);
+        return isset($doc['ids']) ? explode(',', $doc['ids']) : [];
+    }
+
+    /**
+     * @param array<string> $docIds
+     */
     private function saveIndex(FileIndex $index, string $term, array $docIds): void
     {
-        if (!$index->getHandler()) {
-            throw new \StorageException('The index handler is not open. Open it with JsonStorage::open().');
-        }
-
         $this->save(
             $index,
             sprintf('{"%s":"%s"', self::KEY, $term),
             [self::KEY => $term, 'ids' => implode(',', $docIds)],
             function (&$data, $lineData) {
-                $line = json_decode($lineData, 1, 512, JSON_THROW_ON_ERROR);
+                /** @var array{k: string, ids: string} $line */
+                $line = json_decode($lineData, true, 512, JSON_THROW_ON_ERROR);
                 $data['ids'] = implode(',', array_unique(array_merge(
                     explode(',', $line['ids']),
                     explode(',', $data['ids'])
@@ -212,6 +239,9 @@ class JsonStorage implements Storage
         );
     }
 
+    /**
+     * @return array<string, array<string>>
+     */
     private function loadIndices(string $term): array
     {
         $indices = [];
@@ -221,7 +251,7 @@ class JsonStorage implements Storage
             return $indices;
         }
 
-        $indexedVariables = array_filter($this->schemaVariables, fn(string $var) => $var & Schema::IS_INDEXED);
+        $indexedVariables = array_filter($this->schemaVariables, fn(int $options) => boolval($options & Schema::IS_INDEXED));
         foreach ($indexedVariables as $name => $_) {
             $indices[$name] = $this->loadIndex($name, $term);
         }
@@ -229,13 +259,9 @@ class JsonStorage implements Storage
         return $indices;
     }
 
-    private function loadIndex(string $name, string $term): array
-    {
-        $pattern = sprintf('{"%s":"%s"', self::KEY, $term);
-        $doc = $this->load($this->indices[$name], $pattern);
-        return isset($doc['ids']) ? explode(',', $doc['ids']) : [];
-    }
-
+    /**
+     * @return array<string, array<string>>
+     */
     private function loadPrefixIndices(string $prefix): array
     {
         $indices = [];
@@ -245,17 +271,25 @@ class JsonStorage implements Storage
             return $indices;
         }
 
-        $indexedVariables = array_filter($this->schemaVariables, fn(string $var) => $var & Schema::IS_INDEXED);
+        $indexedVariables = array_filter(
+            $this->schemaVariables,
+            fn(int $options) => boolval($options & Schema::IS_INDEXED)
+        );
         foreach ($indexedVariables as $name => $_) {
             $indices[$name] = $this->loadPrefixIndex($name, $prefix);
         }
 
         return $indices;
     }
+
+    /**
+     * @return array<string>
+     */
     private function loadPrefixIndex(string $name, string $prefix): array
     {
         $pattern = sprintf('{"%s":"%s', self::KEY, $prefix);
         $ids = [];
+        /** @var array{k: string, ids: string} $doc */
         foreach ($this->loadPrefix($this->indices[$name], $pattern) as $doc) {
             $ids = array_merge($ids, explode(',', $doc['ids']));
         }
@@ -263,16 +297,19 @@ class JsonStorage implements Storage
     }
 
     /**
-     * @return array<string, array<string, string[]>>
+     * @return array<string, array<string>>
      */
     public function findDocIdsByPrefix(string $prefix, ?string $index = null): array
     {
         $this->open(['mode' => 'r']);
-        $indices = $index ? $this->loadPrefixIndex($index, $prefix) : $this->loadPrefixIndices($prefix);
+        $indices = $index ? [$prefix => $this->loadPrefixIndex($index, $prefix)] : $this->loadPrefixIndices($prefix);
         $this->commit();
         return $indices;
     }
 
+    /**
+     * @return array<string, int|float|bool|string>
+     */
     private function load(FileIndex $index, string $pattern): array
     {
         $data = [];
@@ -281,10 +318,13 @@ class JsonStorage implements Storage
             $pattern
         );
 
-        if ($index->getHandler() && $hit) {
+        if ($hit) {
             $index->moveTo($line * $index->getLength());
             $line = $index->getLine();
-            $data = json_decode($line, true, JSON_THROW_ON_ERROR);
+            if ($line) {
+                /** @var array<string, int|float|bool|string> $data*/
+                $data = json_decode($line, true, JSON_THROW_ON_ERROR);
+            }
         }
 
         return $data;
@@ -302,10 +342,13 @@ class JsonStorage implements Storage
         }
     }
 
+    /**
+     * @param array<string, int|float|bool|string> $data
+     */
     private function save(FileIndex $index, string $pattern, array $data, callable $hitCallback): void
     {
-        if (!flock($index->getHandler(), LOCK_EX)) {
-            throw new \StorageException('The handler is lock. Check if there is any other service writing on one of the files.');
+        if (!$index->lock()) {
+            throw new StorageException('The handler is lock. Check if there is any other service writing on one of the files.');
         }
 
         // Perform a binary search to find if the term exists
@@ -328,7 +371,30 @@ class JsonStorage implements Storage
         $index->moveTo($offset); // rewind
 
         $index->write(str_pad($newLine, $index->getLength() - 1) . PHP_EOL . $remainingBytes);
-        flock($index->getHandler(), LOCK_UN);
+        $index->unLock();
+    }
+
+    private function remove(FileIndex $index, string $pattern): void
+    {
+        if (!$index->lock()) {
+            throw new StorageException('The handler is lock. Check if there is any other service writing on one of the files.');
+        }
+
+        [$hit, $line] = $this->binarySearch($index, $pattern);
+        $offset = $line * $index->getLength();
+        if (!$hit) {
+            flock($index->getHandler(), LOCK_UN);
+            return;
+        }
+
+        $index->moveTo($offset + 1 * $index->getLength());
+        $remainingBytes = stream_get_contents($index->getHandler());
+
+        $index->moveTo($offset); // rewind
+        $index->write($remainingBytes);
+        ftruncate($index->getHandler(), ($index->getTotalLines() - 1) * $index->getLength());
+
+        $index->unLock();
     }
 
     /**
@@ -359,6 +425,9 @@ class JsonStorage implements Storage
         return [false, $low];
     }
 
+    /**
+     * @return array<string>
+     */
     private function binarySearchByPrefix(FileIndex $index, string $prefix): array
     {
         [$hit, $mid] = $this->binarySearch($index, $prefix);
@@ -368,6 +437,9 @@ class JsonStorage implements Storage
         return [];
     }
 
+    /**
+     * @return array<string>
+     */
     private function collectMatches(FileIndex $index, int $start, string $prefix): array
     {
         $matches = [];
@@ -377,7 +449,7 @@ class JsonStorage implements Storage
             $index->moveTo($offset);
             $line = $index->getLine();
 
-            if (strncmp($line, $prefix, strlen($prefix)) === 0) {
+            if ($line && strncmp($line, $prefix, strlen($prefix)) === 0) {
                 $matches[] = $line;
             } else {
                 break;
@@ -391,7 +463,7 @@ class JsonStorage implements Storage
             $index->moveTo($offset);
             $line = $index->getLine();
 
-            if (strncmp($line, $prefix, strlen($prefix)) === 0) {
+            if ($line && strncmp($line, $prefix, strlen($prefix)) === 0) {
                 $matches[] = $line;
             } else {
                 break;
@@ -401,7 +473,7 @@ class JsonStorage implements Storage
         return $matches;
     }
 
-    private function transform(mixed $term): mixed
+    private function transform(string $term): ?string
     {
         /** @var Transformer $transformer */
         foreach ($this->schema->getTransformers() as $transformer) {
@@ -417,7 +489,11 @@ class JsonStorage implements Storage
     {
         $newLength = $this->getNewLength(strlen($newLine) + 1);
         $index->moveTo(0);
-        $fileLines = explode(PHP_EOL, stream_get_contents($index->getHandler()));
+        $text = stream_get_contents($index->getHandler());
+        if (false === $text) {
+            throw new StorageException('Could not read index length.');
+        }
+        $fileLines = explode(PHP_EOL, $text);
         $index->moveTo(0);
         foreach ($fileLines as $fileLine) {
             if ($fileLine === '') {
@@ -434,5 +510,34 @@ class JsonStorage implements Storage
     {
         $multiplier = 1 + ceil($length / self::INDEX_LINE_LENGTH_MIN);
         return intval(self::INDEX_LINE_LENGTH_MIN * $multiplier);
+    }
+
+    /**
+     * @return array<string>
+     */
+    private function getTokensFor(string $text): array
+    {
+        if (!$this->tokenizer) {
+            throw new StorageException('There are no tokenizers defined.');
+        }
+        $tokens = array_filter(array_map(
+            fn(string $token) => $this->transform($token),
+            $this->tokenizer->apply($text)
+        ));
+        return $tokens;
+    }
+
+    /**
+     * @return array{k: string, ids: string}
+     */
+    private function removeDocumentFromToken(FileIndex $index, string $pattern, string $id): array
+    {
+        /** @var array{k: string, ids: string} $indexDoc */
+        $indexDoc = $this->load($index, $pattern);
+        $indexDoc['ids'] = implode(',', array_filter(
+            explode(',', $indexDoc['ids']),
+            fn($token) => $token !== $id
+        ));
+        return $indexDoc;
     }
 }

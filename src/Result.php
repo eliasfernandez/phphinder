@@ -21,7 +21,7 @@ class Result
     private float $weight = 0;
 
     /**
-     * @param array<string, string> $document
+     * @param array<string, int|float|bool|string> $document
      */
     public function __construct(private array $document = [])
     {
@@ -71,7 +71,7 @@ class Result
     }
 
     /**
-     * @return array<string, string>
+     * @return array<string, int|float|bool|string>
      */
     public function getDocument(): array
     {
@@ -79,7 +79,7 @@ class Result
     }
 
     /**
-     * @param array<string, string> $document
+     * @param array<string, int|float|bool|string> $document
      */
     public function setDocument(array $document): Result
     {

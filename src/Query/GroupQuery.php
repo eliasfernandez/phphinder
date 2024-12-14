@@ -15,19 +15,17 @@ use PHPhinder\Exception\QueryException;
 
 class GroupQuery extends Query
 {
+    /**
+     * @var array<Query>
+     */
     protected array $subqueries = [];
     protected string $joint;
 
     /**
      * @param array<Query> $subqueries
      */
-    public function __construct(array $subqueries, protected float $boost = 1.0)
+    final public function __construct(array $subqueries, protected float $boost = 1.0)
     {
-        foreach ($subqueries as $subquery) {
-            if (!($subquery instanceof Query)) {
-                throw new QueryException(sprintf('Invalid subquery %s', get_class($subquery)));
-            }
-        }
         $this->subqueries = $subqueries;
     }
 
