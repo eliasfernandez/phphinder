@@ -17,7 +17,7 @@ $engine->search('Hello OR Hi');
 
 ## Storage
 
-Storage is an interface with defined methods that allow the `SearchEngine` to interact with stored data. Currently, only `JsonStorage` is implemented, but future plans include other options like `RedisStorage`, `DoctrineStorage`, etc.
+Storage is an interface with defined methods that allow the `SearchEngine` to interact with stored data. Currently, `JsonStorage` and `DbalStorage` are implemented. Future plans include other options like `RedisStorage`.
 
 ### JsonStorage Usage
 
@@ -42,6 +42,41 @@ This setup creates the necessary document and index files in the `var/phphinder`
 - `default_schema` corresponds to the schema name (`DefaultSchema` is the default).
 - `*_docs.json` stores documents.
 - `*_text_index.json` and `*_title_index.json` are reversed indices for respective fields.
+
+**Important**: Storing and retrieving results from the file system is fast with a few results but doesn't scale well with bigger data structure. Plan carefully the index creation and the stored data if you want to use it. If the data volume to search is very big, consider DbalStorage instead. 
+
+### DbalStorage Usage
+
+`DbalStorage` uses the[ Doctrine DBAL](https://github.com/doctrine/dbal) package to store the data. Its nature is to be database agnostic which means that you can use any of the databases engines it supports: MySQL, MariaDB, PostgreSQL, Oracle, MS Sql Server, SQLite ...
+
+```php
+use PHPhinder\Index\DbalStorage;
+use PHPhinder\SearchEngine;
+
+$storage = new DbalStorage('pdo-sqlite:///var/search.db');
+$engine = new SearchEngine($storage);
+```
+
+This setup creates the necessary document and index tables in an existing database:
+
+```sql
+    CREATE TABLE default_schema_docs (
+        id character varying(255) NOT NULL,
+        _id text NOT NULL,
+        title text NOT NULL,
+        PRIMARY KEY (id)
+    );
+    CREATE TABLE default_schema_title (
+        k character varying(255) NOT NULL,
+        ids text NOT NULL,
+        PRIMARY KEY (k)
+    );
+    CREATE TABLE default_schema_text (
+        k character varying(255) NOT NULL,
+        ids text NOT NULL,
+        PRIMARY KEY (k)
+    );
+```
 
 ## Schema
 

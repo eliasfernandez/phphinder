@@ -1,6 +1,6 @@
 <?php
 
-/*
+/**
  * This file is part of the PHPhind package.
  *
  * (c) Elías Fernández Velázquez

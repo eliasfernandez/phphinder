@@ -2,7 +2,7 @@
 **A lightweight and modular search engine built in PHP.**  
 
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)  
-[![Packagist](https://img.shields.io/packagist/v/phphinder/phphinder.svg)](https://packagist.org/packages/phphinder/phphinder)  
+[![Packagist](https://img.shields.io/packagist/v/eliasfernandez/phphinder.svg)](https://packagist.org/packages/eliasfernandez/phphinder)  
 
 ---
 
@@ -35,7 +35,7 @@ PHPhinder is an open-source, lightweight, and modular search engine designed for
 ## Installation  
 Install PHPhinder via Composer:  
 ```bash
-composer require phphinder/phphinder
+composer require eliasfernandez/phphinder
 ```
 
 ---

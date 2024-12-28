@@ -36,7 +36,8 @@ class StemmerTransformerTest extends TestCase
             ['accompanied','accompani'],
             ['witnesses','wit'],
             ['write','write'],
-            ['test','test']
+            ['test','test'],
+            ['goat', 'goat'],
         ];
     }
 }

@@ -1,6 +1,6 @@
 <?php
 
-/*
+/**
  * This file is part of the PHPhind package.
  *
  * (c) Elías Fernández Velázquez
@@ -13,7 +13,7 @@ namespace PHPhinder\Index;
 
 use PHPhinder\Exception\FileIndexException;
 
-class FileIndex
+class FileIndex implements Index
 {
     /** @var resource|false $handler */
     private $handler = false;
@@ -125,5 +125,35 @@ class FileIndex
     public function unLock(): bool
     {
         return flock($this->getHandler(), LOCK_UN);
+    }
+
+    public function split(int $offset): void
+    {
+        $remainingHandler = fopen($this->getTemporalPath(), 'w+');
+        fseek($this->getHandler(), $offset);
+        stream_copy_to_stream($this->getHandler(), $remainingHandler);
+        fclose($remainingHandler);
+        ftruncate($this->getHandler(), $offset);
+    }
+
+    public function join(): void
+    {
+        $remainingHandler = @fopen($this->getTemporalPath(), 'r');
+        if (!$remainingHandler) {
+            return;
+        }
+        stream_copy_to_stream($remainingHandler, $this->getHandler());
+        fclose($remainingHandler);
+        unlink($this->getTemporalPath());
+    }
+
+    private function getTemporalPath(): string
+    {
+        return sprintf('%s.2', $this->path);
+    }
+
+    public function drop(): void
+    {
+        unlink($this->getPath());
     }
 }

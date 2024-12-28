@@ -1,6 +1,6 @@
 <?php
 
-/*
+/**
  * This file is part of the PHPhind package.
  *
  * (c) Elías Fernández Velázquez
@@ -51,7 +51,7 @@ class SearchEngine
 
     public function flush(): void
     {
-        $this->storage->open();
+        $this->storage->open(['mode' => 'r+']);
         foreach ($this->results as $result) {
             $docId = $this->getId($result);
             $this->storage->saveDocument($docId, $result->getDocument());
@@ -363,6 +363,7 @@ class SearchEngine
     private function getId(Result $result): string
     {
         $oldDocument = $this->getUniqueDocument($result->getDocument());
+
         if ($oldDocument) {
             $this->storage->removeDocFromIndices($oldDocument);
             return (string) $oldDocument['id'];

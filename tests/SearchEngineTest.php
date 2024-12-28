@@ -2,7 +2,10 @@
 
 namespace Tests;
 
+use PHPhinder\Index\DbalStorage;
+use PHPhinder\Index\Storage;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use PHPhinder\Index\JsonStorage;
 use PHPhinder\SearchEngine;
@@ -14,52 +17,20 @@ use PHPhinder\Transformer\StopWordsFilter;
 #[CoversClass(SearchEngine::class)]
 class SearchEngineTest extends TestCase
 {
-    private SearchEngine $engine;
-    public function setUp(): void
+    #[DataProvider('searchEnginesProvider')]
+    public function testSearchAnd(SearchEngine $engine): void
     {
-        $path = 'var';
-        $iso = 'en';
-        $schema = new TestSchema(
-            new LowerCaseTransformer($iso, StopWordsFilter::class),
-            new StemmerTransformer($iso)
-        );
-        $tokenizer = new RegexTokenizer();
-        $storage = new JsonStorage($path, $schema, $tokenizer);
-        $storage->truncate();
-
-        $this->engine = new SearchEngine($storage);
-        $this->engine->addDocument([
-            '_id' => 1,
-            'title' => 'Cat animal',
-            'text' => "Meow world! This is a PHP search engine.",
-            'description' => 'this is a description'
-        ])->addDocument([
-            '_id' => 2,
-            'title' => 'Dog',
-            'text' => "Bark Bark! PHPhinder makes search development fun to the world.",
-            'description' => 'Describe the problems',
-        ])->addDocument([
-            '_id' => 3,
-            'title' => 'Snake',
-            'text' => "szee szee! This is the minimal PHP search engine for the animal world.",
-            'description' => 'this is a description'
-        ]);
-
-        $this->engine->flush();
-    }
-
-    public function testSearchAnd(): void
-    {
-        $results = $this->engine->search('search engine');
+        $results = $engine->search('search engine');
         $this->assertCount(2, $results);
         $this->assertCount(2, $results[1]->getTerms());
         $this->assertCount(1, $results[1]->getIndices());
         $this->assertTrue($results[0]->isFulltext());
     }
 
-    public function testSearchOr(): void
+    #[DataProvider('searchEnginesProvider')]
+    public function testSearchOr(SearchEngine $engine): void
     {
-        $results = $this->engine->search('search OR engine');
+        $results = $engine->search('search OR engine');
         $this->assertCount(3, $results);
         $this->assertCount(2, $results[1]->getTerms());
         $this->assertCount(1, $results[2]->getTerms());
@@ -68,9 +39,10 @@ class SearchEngineTest extends TestCase
         $this->assertFalse($results[2]->isFulltext());
     }
 
-    public function testSearchParentheses(): void
+    #[DataProvider('searchEnginesProvider')]
+    public function testSearchParentheses(SearchEngine $engine): void
     {
-        $results = $this->engine->search('(search engine) OR fun');
+        $results = $engine->search('(search engine) OR fun');
         $this->assertCount(3, $results);
         $this->assertCount(2, $results[1]->getTerms());
         $this->assertCount(1, $results[2]->getTerms());
@@ -79,9 +51,10 @@ class SearchEngineTest extends TestCase
         $this->assertFalse($results[1]->isFulltext());
     }
 
-    public function testSearchNot(): void
+    #[DataProvider('searchEnginesProvider')]
+    public function testSearchNot(SearchEngine $engine): void
     {
-        $results = $this->engine->search('world NOT(engine)');
+        $results = $engine->search('world NOT(engine)');
 
         $this->assertCount(1, $results);
         $this->assertCount(1, $results[0]->getTerms());
@@ -89,49 +62,53 @@ class SearchEngineTest extends TestCase
         $this->assertFalse($results[0]->isFulltext());
     }
 
-    public function testSearchNotAtFirst(): void
+    #[DataProvider('searchEnginesProvider')]
+    public function testSearchNotAtFirst(SearchEngine $engine): void
     {
-        $results = $this->engine->search('NOT(engine) bark');
+        $results = $engine->search('NOT(engine) bark');
         $this->assertCount(1, $results);
         $this->assertCount(1, $results[0]->getTerms());
         $this->assertCount(1, $results[0]->getIndices());
         $this->assertFalse($results[0]->isFulltext());
     }
 
-    public function testFindDocsByIndex(): void
+    #[DataProvider('searchEnginesProvider')]
+    public function testFindDocsByIndex(SearchEngine $engine): void
     {
-        $results = $this->engine->findDocsByIndex("php");
+        $results = $engine->findDocsByIndex("php");
         $this->assertCount(2, $results['text']);
         $this->assertCount(0, $results['title']);
 
-        $results = $this->engine->findDocsByIndex("search");
+        $results = $engine->findDocsByIndex("search");
         $this->assertCount(3, $results['text']);
         $this->assertCount(0, $results['title']);
 
-        $results = $this->engine->findDocsByIndex("engine");
+        $results = $engine->findDocsByIndex("engine");
         $this->assertCount(2, $results['text']);
 
-        $results = $this->engine->findDocsByIndex("cat");
+        $results = $engine->findDocsByIndex("cat");
         $this->assertCount(0, $results['text']);
         $this->assertCount(1, $results['title']);
 
-        $results = $this->engine->findDocsByIndex("description");
+        $results = $engine->findDocsByIndex("description");
         $this->assertCount(0, $results['text']);
         $this->assertCount(0, $results['title']);
     }
 
-    public function testErrorOnNoRequiredProperty(): void
+    #[DataProvider('searchEnginesProvider')]
+    public function testErrorOnNoRequiredProperty(SearchEngine $engine): void
     {
-        $this->engine->addDocument(['text' => "hello world!"]);
+        $engine->addDocument(['text' => "hello world!"]);
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage('No `title` key provided for doc {"text":"hello world!"}');
-        $this->engine->flush();
-        $this->engine->findDocsByIndex("php");
+        $engine->flush();
+        $engine->findDocsByIndex("php");
     }
 
-    public function testSortedResults(): void
+    #[DataProvider('searchEnginesProvider')]
+    public function testSortedResults(SearchEngine $engine): void
     {
-        $results = $this->engine->search('animal world');
+        $results = $engine->search('animal world');
 
         $this->assertCount(2, $results);
         $this->assertCount(2, $results[0]->getTerms());
@@ -157,20 +134,67 @@ class SearchEngineTest extends TestCase
         $this->assertEquals('Hi', $results[1]->getDocument()['title']);
     }
 
-    public function testAddUniqueDocumentsOverridePreviousOne(): void
+    #[DataProvider('searchEnginesProvider')]
+    public function testAddUniqueDocumentsOverridePreviousOne(SearchEngine $engine): void
     {
-        $this->engine->addDocument([
+        $engine->addDocument([
             '_id' => 1,
             'title' => 'Cow',
             'text' => "Mooh world! This is a PHP search engine.",
             'description' => 'this is a description'
         ]);
-        $this->engine->flush();
+        $engine->flush();
 
-        $results = $this->engine->search('meow');
+        $results = $engine->search('meow');
         $this->assertCount(0, $results);
 
-        $results = $this->engine->search('mooh');
+        $results = $engine->search('mooh');
         $this->assertCount(1, $results);
+    }
+
+    public static function searchEnginesProvider(): array
+    {
+        $storage = new JsonStorage('var', new TestSchema(
+            new LowerCaseTransformer('en', StopWordsFilter::class),
+            new StemmerTransformer('en')
+        ), new RegexTokenizer());
+        $jsonEngine = self::createSearchEngine($storage);
+
+        $storage = new DbalStorage('pdo-sqlite:///var/test.sqlite', new TestSchema(
+            new LowerCaseTransformer('en', StopWordsFilter::class),
+            new StemmerTransformer('en')
+        ), new RegexTokenizer());
+        $dbalEngine = self::createSearchEngine($storage);
+
+        return [
+            'json' => [$jsonEngine],
+            'dbal' => [$dbalEngine],
+        ];
+    }
+
+    public static function createSearchEngine(Storage $storage): SearchEngine
+    {
+        $storage->truncate();
+
+        $jsonEngine = new SearchEngine($storage);
+        $jsonEngine->addDocument([
+            '_id' => 1,
+            'title' => 'Cat animal',
+            'text' => "Meow world! This is a PHP search engine.",
+            'description' => 'this is a description'
+        ])->addDocument([
+            '_id' => 2,
+            'title' => 'Dog',
+            'text' => "Bark Bark! PHPhinder makes search development fun to the world.",
+            'description' => 'Describe the problems',
+        ])->addDocument([
+            '_id' => 3,
+            'title' => 'Snake',
+            'text' => "szee szee! This is the minimal PHP search engine for the animal world.",
+            'description' => 'this is a description'
+        ]);
+
+        $jsonEngine->flush();
+        return $jsonEngine;
     }
 }

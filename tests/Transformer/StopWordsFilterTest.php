@@ -64,7 +64,9 @@ class StopWordsFilterTest extends TestCase
             ['yet', false],
             ['test', true],
             ['españa', true],
-            ['🤗', true]
+            ['🤗', true],
+            ['goat', true],
+            ['the', false],
         ];
     }
 }
