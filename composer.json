@@ -21,6 +21,6 @@
     ],
     "require": {
         "wamania/php-stemmer": "3.0.1",
-        "doctrine/dbal": "^4.2"
+        "doctrine/dbal": "^3"
     }
 }
