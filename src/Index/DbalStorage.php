@@ -11,6 +11,7 @@
 
 namespace PHPhinder\Index;
 
+use Doctrine\DBAL\ArrayParameterType;
 use PHPhinder\Exception\StorageException;
 use PHPhinder\Schema\DefaultSchema;
 use PHPhinder\Schema\Schema;
@@ -22,11 +23,13 @@ class DbalStorage extends AbstractStorage implements Storage
 {
     public function __construct(
         private readonly string $connectionString,
-        protected readonly Schema $schema = new DefaultSchema(),
-        protected readonly Tokenizer $tokenizer = new RegexTokenizer()
+        Schema $schema = new DefaultSchema(),
+        Tokenizer $tokenizer = new RegexTokenizer()
     ) {
-        $this->docs = new DbalIndex($connectionString,  sprintf('%s_%s', StringHelper::getShortClass($schema::class), 'docs'));
-        $this->schemaVariables = (new \ReflectionClass($schema::class))->getDefaultProperties();
+        $this->docs = new DbalIndex($connectionString, sprintf('%s_%s', StringHelper::getShortClass($schema::class), 'docs'));
+        $this->state = new DbalIndex($connectionString, sprintf('%s_%s', StringHelper::getShortClass($schema::class), 'states'));
+
+        parent::__construct($schema, $tokenizer);
 
         /**
          * @var string $name
@@ -37,7 +40,11 @@ class DbalStorage extends AbstractStorage implements Storage
                 throw new StorageException(sprintf('The schema provided contains a property with the reserved name %s', self::ID));
             }
             if ($options & Schema::IS_INDEXED) {
-                $this->indices[$name] = new DbalIndex($this->connectionString, sprintf('%s_%s', StringHelper::getShortClass($schema::class), $name));
+                $this->indices[$name] = new DbalIndex(
+                    $this->connectionString,
+                    sprintf('%s_%s', StringHelper::getShortClass($schema::class), $name),
+                    $options
+                );
             }
         }
     }
@@ -49,10 +56,19 @@ class DbalStorage extends AbstractStorage implements Storage
                 array_filter($this->schemaVariables, fn ($var) => $var & Schema::IS_STORED)
             )));
         }
+
+        if (!$this->state->isCreated()) {
+            $this->state->create([self::STATE]);
+        }
+
         /** @var DbalIndex $index */
         foreach ($this->indices as $index) {
             if (!$index->isCreated()) {
-                $index->create([self::KEY, 'ids']);
+                $columns = [self::KEY, 'ids', self::STATE];
+                if ($index->getSchemaOptions() & Schema::IS_UNIQUE) {
+                    unset($columns[2]);
+                }
+                $index->create($columns);
             }
         }
     }
@@ -69,6 +85,18 @@ class DbalStorage extends AbstractStorage implements Storage
     public function count(): int
     {
         return $this->docs->getTotal();
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function saveStates(array $states): void
+    {
+        $this->state->truncate();
+        $this->state->insertMultiple(
+            [DbalStorage::STATE],
+            array_map(fn($state) => [$state], $states)
+        );
     }
 
 
@@ -91,10 +119,26 @@ class DbalStorage extends AbstractStorage implements Storage
     }
 
     /**
+     * @param DbalIndex $index
+     */
+    protected function loadAll(Index $index): \Generator
+    {
+        return $index->findAll();
+    }
+
+    /**
+     * @inheritDoc
+     */
+    protected function loadByStates(Index $index, array $states): \Generator
+    {
+        return $index->findAll([self::STATE => $states], [ArrayParameterType::INTEGER]);
+    }
+
+    /**
      * @inheritDoc
      * @param DbalIndex $index
      */
-    protected function save(Index $index, array $search, array $data, callable $hitCallback): void
+    protected function save(Index $index, array $search, array $data, ?callable $hitCallback = null): void
     {
         $index->upsert($search, $data);
     }

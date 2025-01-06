@@ -47,6 +47,17 @@ interface Storage
     public function saveIndices(string $docId, array $data): void;
 
     /**
+     * Saves an state (if it doesn't exists) on the Storage.
+     * @param array<int> $states
+     */
+    public function saveStates(array $states): void;
+
+    /**
+     * @return \Generator<int>
+     */
+    public function getStates(): \Generator;
+
+    /**
      * @param array<int|string> $docIds
      * @return \Generator<array{string|int, array<string, int|float|bool|string>}>
      */
@@ -69,6 +80,19 @@ interface Storage
      * @return array<string, array<string>>
      */
     public function findDocIdsByIndex(string $term, ?string $index = null): array;
+
+    /**
+     * Given a mistyped term, gets the doc ids by index in the form of an associative
+     * array with this shape:
+     *
+     * [
+     *     index1 => [ '1', '2', ... 'Z'],
+     *     ...,
+     *     indexN => [ '1', '2', ... 'Z'],
+     * ]
+     * @return array<string, array<string>>
+     */
+    public function findDocIdsByIndexWithTypoTolerance(string $term, ?string $index = null): array;
 
     /**
      * Given a prefix, gets the doc ids by index in the form of an associative array with

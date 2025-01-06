@@ -28,7 +28,8 @@ PHPhinder is an open-source, lightweight, and modular search engine designed for
 - **Support for advanced queries**, including prefix queries, AND/OR/NOT combinations, and field-specific searches.  
 - **Lightweight and efficient**, with minimal dependencies.  
 - **Easy integration** with Symfony or other PHP frameworks.  
-- **Highly extensible**, allowing customization of query parsers and indexers.  
+- **Highly extensible**, allowing customization of query parsers and indexers.
+- **Fuzzy search**. If no exact matches are found typo tolerance search is triggered
 
 ---
 

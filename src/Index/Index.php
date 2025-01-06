@@ -9,4 +9,6 @@ interface Index
     public function isCreated(): bool;
     public function isEmpty(): bool;
     public function drop(): void;
+
+    public function getSchemaOptions(): int;
 }

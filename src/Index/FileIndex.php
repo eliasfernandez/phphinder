@@ -21,8 +21,11 @@ class FileIndex implements Index
     /**
      * @param int<0, max> $lineLength
      */
-    public function __construct(private readonly string $path, private int $lineLength = 0)
-    {
+    public function __construct(
+        private readonly string $path,
+        private int $lineLength = 0,
+        private readonly int $schemaOptions = 0
+    ) {
     }
 
     /**
@@ -127,6 +130,9 @@ class FileIndex implements Index
         return flock($this->getHandler(), LOCK_UN);
     }
 
+    /**
+     * @param int<0, max> $offset
+     */
     public function split(int $offset): void
     {
         $remainingHandler = fopen($this->getTemporalPath(), 'w+');
@@ -155,5 +161,10 @@ class FileIndex implements Index
     public function drop(): void
     {
         unlink($this->getPath());
+    }
+
+    public function getSchemaOptions(): int
+    {
+        return $this->schemaOptions;
     }
 }

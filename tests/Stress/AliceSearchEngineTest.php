@@ -30,6 +30,7 @@ class AliceSearchEngineTest extends TestCase
         $storage = new JsonStorage($path, $schema, $tokenizer);
 
         $this->engine = new SearchEngine($storage);
+        //$storage->truncate();
         if ($storage->isEmpty()) {
             $handler = fopen(__DIR__ . '/pg11.txt', 'r+');
             if (!$handler) {
@@ -94,6 +95,9 @@ class AliceSearchEngineTest extends TestCase
             ['said poor Alice', 0.5, 1],
             ['Alice NOT(wonderland)', 0.15, 395],
             ['Hatter', 0.05, 57],
+            ['gryphon', 0.15, 55],
+            ['griphon', 0.15, 55],
+            ['winder', 0.3, 36], //winter, wander, wider, wonder
         ];
     }
 }
