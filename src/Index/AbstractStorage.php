@@ -209,7 +209,10 @@ abstract class AbstractStorage implements Storage
         $this->save(
             $index,
             [self::KEY => $term],
-            array_filter([self::KEY => $term, 'ids' => implode(',', $docIds), self::STATE => $state]),
+            array_filter(
+                [self::KEY => $term, 'ids' => implode(',', $docIds), self::STATE => $state],
+                fn ($value) => !is_null($value)
+            ),
             function (&$data, $lineData) {
                 /** @var array{k: string, ids: string} $line */
                 $line = json_decode($lineData, true, 512, JSON_THROW_ON_ERROR);

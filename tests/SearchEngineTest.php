@@ -170,6 +170,9 @@ class SearchEngineTest extends TestCase
         $this->assertFalse($results[2]->isFulltext());
     }
 
+    /**
+     * @return array<string, array<SearchEngine>>
+     */
     public static function searchEnginesProvider(): array
     {
         $storage = new JsonStorage('var', new TestSchema(
