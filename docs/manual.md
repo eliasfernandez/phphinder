@@ -155,3 +155,11 @@ $engine->search('title:hello NOT(world OR other:foo*)');
 ```
 
 This query language is powerful, flexible, and easy to use. Future updates may include configurable boost levels for terms.
+
+## Fuzzy searches
+
+In case there is no direct result for a word, the engine will try to find similar matches. It uses the Levenshtein distance to calculate the similarity and the state of every term in non unique indices is stored using the amazing library [State-set-index](https://github.com/Toflar/state-set-index).
+
+Matches will be shown only for words greater than 5 characters and distance of 1 or greater than 9 and distance of 2.
+
+

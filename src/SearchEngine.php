@@ -164,6 +164,21 @@ class SearchEngine
             $query->getValue(),
             self::ANY_SYMBOL !== $query->getField() ? $query->getField() : null
         );
+
+        /**
+         * Only if there are no matches, use the typo tolerance search
+         */
+        if (
+            array_sum(array_map(
+                fn (array $indexIds) => count($indexIds),
+                $termByIndex[$query->getValue()]
+            )) === 0
+        ) {
+            $termByIndex[$query->getValue()] = $this->storage->findDocIdsByIndexWithTypoTolerance(
+                $query->getValue(),
+                self::ANY_SYMBOL !== $query->getField() ? $query->getField() : null
+            );
+        }
         return $this->attachDocuments($termByIndex, $docs);
     }
 

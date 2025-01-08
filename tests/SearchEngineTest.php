@@ -152,6 +152,27 @@ class SearchEngineTest extends TestCase
         $this->assertCount(1, $results);
     }
 
+    #[DataProvider('searchEnginesProvider')]
+    public function testSearchTypo(SearchEngine $engine): void
+    {
+        $results = $engine->search('phphender');
+
+        $this->assertCount(1, $results);
+        $this->assertCount(1, $results[2]->getTerms());
+        $this->assertCount(1, $results[2]->getIndices());
+        $this->assertFalse($results[2]->isFulltext());
+
+        $results = $engine->search('develep');
+
+        $this->assertCount(1, $results);
+        $this->assertCount(1, $results[2]->getTerms());
+        $this->assertCount(1, $results[2]->getIndices());
+        $this->assertFalse($results[2]->isFulltext());
+    }
+
+    /**
+     * @return array<string, array<SearchEngine>>
+     */
     public static function searchEnginesProvider(): array
     {
         $storage = new JsonStorage('var', new TestSchema(

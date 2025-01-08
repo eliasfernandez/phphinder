@@ -3,28 +3,56 @@
 namespace PHPhinder\Index;
 
 use PHPhinder\Exception\StorageException;
+use PHPhinder\Schema\DefaultSchema;
 use PHPhinder\Schema\Schema;
+use PHPhinder\Token\RegexTokenizer;
 use PHPhinder\Token\Tokenizer;
+use PHPhinder\Utils\TypoTolerance;
+use Toflar\StateSetIndex\Alphabet\Utf8Alphabet;
+use Toflar\StateSetIndex\Config;
+use Toflar\StateSetIndex\DataStore\InMemoryDataStore;
+use Toflar\StateSetIndex\Levenshtein;
+use Toflar\StateSetIndex\StateSetIndex;
 
 abstract class AbstractStorage implements Storage
 {
     public const KEY = 'k';
     public const ID = 'id';
+    public const STATE = 's';
     protected Index $docs;
     /** @var array<string, Index> */
     protected array $indices;
 
+    protected Index $state;
+
     /** @var array<string, mixed> $schemaVariables*/
     protected array $schemaVariables;
-    protected readonly Schema $schema;
-    protected readonly Tokenizer $tokenizer;
 
+    protected StateSetIndex $stateSetIndex;
+
+    public function __construct(
+        protected readonly Schema $schema = new DefaultSchema(),
+        protected readonly Tokenizer $tokenizer = new RegexTokenizer(),
+    ) {
+        $this->schemaVariables = (new \ReflectionClass($schema::class))->getDefaultProperties();
+        $this->stateSetIndex = new StateSetIndex(
+            new Config(TypoTolerance::INDEX_LENGTH, TypoTolerance::ALPHABET_SIZE),
+            new Utf8Alphabet(),
+            new StateSet($this),
+            new InMemoryDataStore()
+        );
+    }
 
     public function truncate(): void
     {
         if ($this->docs->isCreated()) {
             $this->docs->drop();
         }
+
+        if ($this->state->isCreated()) {
+            $this->state->drop();
+        }
+
         foreach ($this->indices as $index) {
             if ($index->isCreated()) {
                 $index->drop();
@@ -40,6 +68,12 @@ abstract class AbstractStorage implements Storage
             $index->close();
         }
         $this->docs->close();
+
+        /** @var StateSet $stateSet */
+        $stateSet = $this->stateSetIndex->getStateSet();
+        $stateSet->persist();
+
+        $this->state->close();
     }
 
     public function saveDocument(string $docId, array $data): void
@@ -57,8 +91,10 @@ abstract class AbstractStorage implements Storage
                 $doc[$name] = $data[$name];
             }
         }
-        $this->save($this->docs, [self::ID => $docId], $doc, fn (&$data, $lineData) => true);
+        $this->save($this->docs, [self::ID => $docId], $doc);
     }
+
+    abstract public function saveStates(array $states): void;
 
     public function loadDocument(string|int $docId): array
     {
@@ -74,9 +110,11 @@ abstract class AbstractStorage implements Storage
             if ($options & Schema::IS_INDEXED) {
                 $tokens = $this->tokenizer->apply($data[$name]);
                 foreach ($tokens as $token) {
-                    $token = $this->transform($token);
-                    if (null === $token) {
-                        continue;
+                    if (~$options & Schema::IS_UNIQUE) {
+                        $token = $this->transform($token);
+                        if (null === $token) {
+                            continue;
+                        }
                     }
                     $existingDocIds = $this->loadIndex($name, $token);
                     if (!in_array($docId, $existingDocIds)) {
@@ -120,7 +158,7 @@ abstract class AbstractStorage implements Storage
                         continue;
                     }
 
-                    $this->save($this->indices[$name], [self::KEY => $token], $indexDoc, fn (&$data, $lineData) => true);
+                    $this->save($this->indices[$name], [self::KEY => $token], $indexDoc);
                 }
             }
         }
@@ -133,15 +171,48 @@ abstract class AbstractStorage implements Storage
         return isset($doc['ids']) ? explode(',', $doc['ids']) : [];
     }
 
+    public function loadIndexWithTypoTolerance(string $name, int|float|bool|string $term): array
+    {
+        $ids = [];
+        $levenshteinDistance = TypoTolerance::getLevenshteinDistanceForTerm($term);
+
+        if ($levenshteinDistance === 0) {
+            return [];
+        }
+
+        $states = $this->stateSetIndex->findMatchingStates($term, $levenshteinDistance, 1);
+
+        foreach ($this->loadByStates($this->indices[$name], $states) as $doc) {
+            if (Levenshtein::distance($term, $doc['k']) > $levenshteinDistance) {
+                continue;
+            }
+            $ids = array_merge($ids, explode(',', $doc['ids']));
+        }
+
+        return $ids;
+    }
+
     /**
      * @param array<string> $docIds
      */
     protected function saveIndex(Index $index, string $term, array $docIds): void
     {
+        $state = null;
+
+        if (Schema::IS_UNIQUE & ~$index->getSchemaOptions()) {
+            $state = current($this->stateSetIndex->index([$term]));
+            /** @var StateSet $stateSet */
+            $stateSet = $this->stateSetIndex->getStateSet();
+            $stateSet->add($state);
+        }
+
         $this->save(
             $index,
             [self::KEY => $term],
-            [self::KEY => $term, 'ids' => implode(',', $docIds)],
+            array_filter(
+                [self::KEY => $term, 'ids' => implode(',', $docIds), self::STATE => $state],
+                fn ($value) => !is_null($value)
+            ),
             function (&$data, $lineData) {
                 /** @var array{k: string, ids: string} $line */
                 $line = json_decode($lineData, true, 512, JSON_THROW_ON_ERROR);
@@ -152,25 +223,29 @@ abstract class AbstractStorage implements Storage
             }
         );
     }
-        /**
+
+    /**
      * @return array<string, array<string>>
      */
-    protected function loadIndices(string $term): array
+    protected function loadIndices(string $term, bool $typoTolerance = false): array
     {
-        $indices = [];
-
-        $term = $this->transform($term);
-        if (null === $term) {
-            return $indices;
-        }
-
         $indexedVariables = array_filter($this->schemaVariables, fn(int $options) => boolval($options & Schema::IS_INDEXED));
         foreach ($indexedVariables as $name => $_) {
-            $indices[$name] = $this->loadIndex($name, $term);
+            if ($this->indices[$name]->getSchemaOptions() & Schema::IS_UNIQUE) {
+                continue;
+            }
+            $indices[$name] = !$typoTolerance ? $this->loadIndex($name, $term) : $this->loadIndexWithTypoTolerance($name, $term);
         }
 
         return $indices;
+    }
 
+    /**
+     * @return array<string, array<string>>
+     */
+    protected function loadIndicesWithTypoTolerance(string $term): array
+    {
+        return $this->loadIndices($term, true);
     }
 
     /**
@@ -179,11 +254,6 @@ abstract class AbstractStorage implements Storage
     protected function loadPrefixIndices(string $prefix): array
     {
         $indices = [];
-
-        $prefix = $this->transform($prefix);
-        if (null === $prefix) {
-            return $indices;
-        }
 
         $indexedVariables = array_filter(
             $this->schemaVariables,
@@ -259,10 +329,44 @@ abstract class AbstractStorage implements Storage
         $this->commit();
     }
 
+    /**
+     * @inheritdoc
+     */
+    public function getStates(): \Generator
+    {
+        foreach ($this->loadAll($this->state) as $state) {
+            yield $state[self::STATE];
+        }
+    }
+
+    /**
+     * @inheritdoc
+     */
     public function findDocIdsByIndex(string $term, ?string $index = null): array
     {
+        $term = $this->transform($term);
+        if (null === $term) {
+            return [];
+        }
+
         $this->open();
         $indices = $index ? [$index => $this->loadIndex($index, $term)] : $this->loadIndices($term);
+        $this->commit();
+        return $indices;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function findDocIdsByIndexWithTypoTolerance(string $term, ?string $index = null): array
+    {
+        $term = $this->transform($term);
+        if (null === $term) {
+            return [];
+        }
+
+        $this->open();
+        $indices = $index ? [$index => $this->loadIndexWithTypoTolerance($index, $term)] : $this->loadIndicesWithTypoTolerance($term);
         $this->commit();
         return $indices;
     }
@@ -272,6 +376,11 @@ abstract class AbstractStorage implements Storage
      */
     public function findDocIdsByPrefix(string $prefix, ?string $index = null): array
     {
+        $prefix = $this->transform($prefix);
+        if (null === $prefix) {
+            return [];
+        }
+
         $this->open();
         $indices = $index ? [$prefix => $this->loadPrefixIndex($index, $prefix)] : $this->loadPrefixIndices($prefix);
         $this->commit();
@@ -282,28 +391,41 @@ abstract class AbstractStorage implements Storage
     /**
      * @param array{string: string} $search
      */
-    protected abstract function loadPrefix(Index $index, array $search): \Generator;
+    abstract protected function loadPrefix(Index $index, array $search): \Generator;
 
-    public abstract function initialize(): void;
+    abstract public function initialize(): void;
 
-    public abstract function open(array $opts = []): void;
+    abstract public function open(array $opts = []): void;
 
-    public abstract function count(): int;
+    abstract public function count(): int;
+
+
+    /**
+     * @param FileIndex $index
+     * @param array<int> $states
+     */
+    abstract protected function loadByStates(Index $index, array $states): \Generator;
 
     /**
      * @param array{string: string} $search
      * @return array<string, int|float|bool|string>
      */
-    protected abstract function load(Index $index, array $search): array;
+    abstract protected function load(Index $index, array $search): array;
 
     /**
-     * @param array{string: string} $search
+     * @return array<string, int|float|bool|string>
+     */
+    abstract protected function loadAll(Index $index): \Generator;
+
+
+    /**
+     * @param array{string: int|float|bool|string} $search
      * @param array<string, int|float|bool|string> $data
      */
-    protected abstract function save(Index $index, array $search, array $data, callable $hitCallback): void;
+    abstract protected function save(Index $index, array $search, array $data, ?callable $hitCallback = null): void;
 
      /**
      * @param array{string: string} $search
      */
-    protected abstract function remove(Index $index, array $search): void;
+    abstract protected function remove(Index $index, array $search): void;
 }

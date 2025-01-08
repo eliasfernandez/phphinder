@@ -25,12 +25,14 @@ class JsonStorage extends AbstractStorage implements Storage
 
     public function __construct(
         string $path,
-        protected readonly Schema $schema = new DefaultSchema(),
-        protected readonly Tokenizer $tokenizer = new RegexTokenizer(),
+        Schema $schema = new DefaultSchema(),
+        Tokenizer $tokenizer = new RegexTokenizer(),
         private readonly int $docsLineLength = self::DOCS_LINE_LENGTH
     ) {
         $this->docs = new FileIndex($path . DIRECTORY_SEPARATOR . sprintf('%s_docs.json', StringHelper::getShortClass($schema::class)), $this->docsLineLength);
-        $this->schemaVariables = (new \ReflectionClass($schema::class))->getDefaultProperties();
+        $this->state = new FileIndex($path . DIRECTORY_SEPARATOR . sprintf('%s_states.json', StringHelper::getShortClass($schema::class)), 36);
+
+        parent::__construct($schema, $tokenizer);
 
         /**
          * @var string $name
@@ -41,7 +43,11 @@ class JsonStorage extends AbstractStorage implements Storage
                 throw new StorageException(sprintf('The schema provided contains a property with the reserved name %s', self::ID));
             }
             if ($options & Schema::IS_INDEXED) {
-                $this->indices[$name] = new FileIndex($path . DIRECTORY_SEPARATOR . sprintf('%s_%s_index.json', StringHelper::getShortClass($schema::class), $name));
+                $this->indices[$name] = new FileIndex(
+                    $path . DIRECTORY_SEPARATOR . sprintf('%s_%s_index.json', StringHelper::getShortClass($schema::class), $name),
+                    0,
+                    $options
+                );
             }
         }
     }
@@ -51,6 +57,11 @@ class JsonStorage extends AbstractStorage implements Storage
         if (!$this->docs->isCreated()) {
             file_put_contents($this->docs->getPath(), "");
         }
+
+        if (!$this->state->isCreated()) {
+            file_put_contents($this->state->getPath(), "");
+        }
+
         /** @var FileIndex $index */
         foreach ($this->indices as $index) {
             if (!$index->isCreated()) {
@@ -68,12 +79,30 @@ class JsonStorage extends AbstractStorage implements Storage
             }
         }
         $this->docs->open($opts);
+        $this->state->open(['mode' => 'r+']);
     }
 
 
     public function count(): int
     {
         return $this->docs->getTotalLines();
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function saveStates(array $states): void
+    {
+        ftruncate($this->state->getHandler(), 0);
+
+        $this->state->lock();
+        foreach ($states as $state) {
+            $this->state->write(str_pad(
+                sprintf('{"s":%s}', $state),
+                $this->state->getLength() - 1
+            ) . PHP_EOL);
+        }
+        $this->state->unlock();
     }
 
     /**
@@ -122,9 +151,43 @@ class JsonStorage extends AbstractStorage implements Storage
      * @inheritDoc
      * @param FileIndex $index
      */
-    protected function save(Index $index, array $search, array $data, callable $hitCallback): void
+    protected function loadAll(Index $index): \Generator
     {
-        $pattern = sprintf('{"%s":"%s"', key($search), current($search));
+        $index->moveTo(0);
+        while ($line = $index->getLine()) {
+            yield json_decode($line, true, JSON_THROW_ON_ERROR);
+        }
+    }
+
+    /**
+     * @inheritDoc
+     */
+    protected function loadByStates(Index $index, array $states): \Generator
+    {
+        $pattern = sprintf('"%s":(%s)}', self::STATE, implode('|', $states));
+        $output = shell_exec(sprintf(
+            "grep -E '%s' %s",
+            $pattern,
+            $index->getPath()
+        ));
+
+        if ($output) {
+            $matches = explode("\n", $output);
+            array_pop($matches); // remove last line
+            foreach ($matches as $match) {
+                yield json_decode($match, true, JSON_THROW_ON_ERROR);
+            }
+        }
+    }
+
+    /**
+     * @inheritDoc
+     * @param FileIndex $index
+     */
+    protected function save(Index $index, array $search, array $data, ?callable $hitCallback = null): void
+    {
+        $value = current($search);
+        $pattern = sprintf('{"%s":%s', key($search), is_int($value) ? $value : "\"{$value}\"");
         if (!$index->lock()) {
             throw new StorageException('The handler is lock. Check if there is any other service writing on one of the files.');
         }
@@ -136,11 +199,13 @@ class JsonStorage extends AbstractStorage implements Storage
         $lineData = $index->getLine();
 
         if ($hit) {
-            $hitCallback($data, $lineData);
+            if ($hitCallback) {
+                $hitCallback($data, $lineData);
+            }
         } else {
             $index->split($offset);
-
         }
+
         try {
             $newLine = json_encode($data, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
         } catch (\JsonException $e) {
