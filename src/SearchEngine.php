@@ -308,7 +308,7 @@ class SearchEngine
         foreach ($result->getIndices() as $index) {
             if (isset($terms[$index])) {
                 $score += $this->boostTermByIndex($terms[$index], $result->getTerms(), $score);
-            } else if (isset($terms[self::ANY_SYMBOL])) {
+            } elseif (isset($terms[self::ANY_SYMBOL])) {
                 $score += $this->boostTermByIndex($terms[self::ANY_SYMBOL], $result->getTerms(), $score);
             }
         }

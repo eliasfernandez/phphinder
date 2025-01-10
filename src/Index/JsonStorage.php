@@ -23,6 +23,15 @@ class JsonStorage extends AbstractStorage implements Storage
     private const INDEX_LINE_LENGTH_MIN = 12;
     private const DOCS_LINE_LENGTH = 256;
 
+    /** @var FileIndex  */
+    protected Index $state;
+
+    /** @var FileIndex */
+    protected Index $docs;
+
+    /** @var array<string, FileIndex> */
+    protected array $indices = [];
+
     public function __construct(
         string $path,
         Schema $schema = new DefaultSchema(),
@@ -102,7 +111,6 @@ class JsonStorage extends AbstractStorage implements Storage
             $this->remove($this->state, [self::STATE => $state]);
         }
         $this->state->unlock();
-
     }
 
     /**
@@ -161,6 +169,7 @@ class JsonStorage extends AbstractStorage implements Storage
 
     /**
      * @inheritDoc
+     * @param FileIndex $index
      */
     protected function loadByStates(Index $index, array $states): \Generator
     {
@@ -264,7 +273,8 @@ class JsonStorage extends AbstractStorage implements Storage
             $line = $index->getLine();
 
             // compare
-            $comparison = strncmp($line, $pattern, strlen($pattern));
+            $comparison = $line !== false ? strncmp($line, $pattern, strlen($pattern)) : -1;
+
             if ($comparison === 0) {
                 return [true, $mid]; // Term found
             } elseif ($comparison < 0) {
@@ -346,6 +356,9 @@ class JsonStorage extends AbstractStorage implements Storage
         return $line * $newLength;
     }
 
+    /**
+     * @return int<0, max>
+     */
     private function getNewLength(int $length): int
     {
         $multiplier = 1 + ceil($length / self::INDEX_LINE_LENGTH_MIN);

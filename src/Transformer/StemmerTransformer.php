@@ -19,7 +19,7 @@ class StemmerTransformer implements Transformer
     use TransformerTrait;
 
     /** @var Filter[] */
-    private array $filters=[];
+    private array $filters = [];
     private Stemmer $stemmer;
 
     public function __construct(string $langIso = 'en', string ...$filters)

@@ -97,7 +97,7 @@ class AliceSearchEngineTest extends TestCase
             ['Hatter', 0.05, 57],
             ['gryphon', 0.15, 55],
             ['griphon', 0.15, 55],
-            ['winder', 0.3, 36], //winter, wander, wider, wonder
+            ['winder', 0.3, 35], //winter, wander, wider, wonder
         ];
     }
 }

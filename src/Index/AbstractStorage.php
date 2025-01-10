@@ -19,6 +19,7 @@ abstract class AbstractStorage implements Storage
     public const KEY = 'k';
     public const ID = 'id';
     public const STATE = 's';
+
     protected Index $docs;
     /** @var array<string, Index> */
     protected array $indices;
@@ -152,7 +153,11 @@ abstract class AbstractStorage implements Storage
                 $tokens = $this->getTokensFor($doc[$name]);
                 foreach ($tokens as $token) {
                      /** @var array{k: string, ids: string} $indexDoc */
-                    $indexDoc = $this->removeDocumentFromToken($this->indices[$name], [self::KEY => $token], $doc['id']);
+                    $indexDoc = $this->removeDocumentFromToken(
+                        $this->indices[$name],
+                        [self::KEY => $token],
+                        $doc['id']
+                    );
                     if ($indexDoc['ids'] === '') {
                         $this->remove($this->indices[$name], [self::KEY => $token]);
                         continue;
@@ -229,7 +234,12 @@ abstract class AbstractStorage implements Storage
      */
     protected function loadIndices(string $term, bool $typoTolerance = false): array
     {
-        $indexedVariables = array_filter($this->schemaVariables, fn(int $options) => boolval($options & Schema::IS_INDEXED));
+        $indexedVariables = array_filter(
+            $this->schemaVariables,
+            fn(int $options) => boolval($options & Schema::IS_INDEXED)
+        );
+
+        $indices = [];
         foreach ($indexedVariables as $name => $_) {
             if ($this->indices[$name]->getSchemaOptions() & Schema::IS_UNIQUE) {
                 continue;
@@ -296,9 +306,6 @@ abstract class AbstractStorage implements Storage
      */
     protected function getTokensFor(string $text): array
     {
-        if (!$this->tokenizer) {
-            throw new StorageException('There are no tokenizers defined.');
-        }
         return array_unique(array_filter(array_map(
             fn(string $token) => $this->transform($token),
             $this->tokenizer->apply($text)
@@ -366,7 +373,9 @@ abstract class AbstractStorage implements Storage
         }
 
         $this->open();
-        $indices = $index ? [$index => $this->loadIndexWithTypoTolerance($index, $term)] : $this->loadIndicesWithTypoTolerance($term);
+        $indices = $index ? [
+            $index => $this->loadIndexWithTypoTolerance($index, $term)
+        ] : $this->loadIndicesWithTypoTolerance($term);
         $this->commit();
         return $indices;
     }
@@ -389,7 +398,7 @@ abstract class AbstractStorage implements Storage
     }
 
     /**
-     * @param array{string: string} $search
+     * @param array<string, string> $search
      */
     abstract protected function loadPrefix(Index $index, array $search): \Generator;
 
@@ -401,31 +410,31 @@ abstract class AbstractStorage implements Storage
 
 
     /**
-     * @param FileIndex $index
+     * @param Index $index
      * @param array<int> $states
      */
     abstract protected function loadByStates(Index $index, array $states): \Generator;
 
     /**
-     * @param array{string: string} $search
+     * @param array<string, string> $search
      * @return array<string, int|float|bool|string>
      */
     abstract protected function load(Index $index, array $search): array;
 
     /**
-     * @return array<string, int|float|bool|string>
+     * @return \Generator
      */
     abstract protected function loadAll(Index $index): \Generator;
 
 
     /**
-     * @param array{string: int|float|bool|string} $search
+     * @param array<string, int|float|bool|string> $search
      * @param array<string, int|float|bool|string> $data
      */
     abstract protected function save(Index $index, array $search, array $data, ?callable $hitCallback = null): void;
 
      /**
-     * @param array{string: string} $search
+     * @param array<string, string|int|bool> $search
      */
     abstract protected function remove(Index $index, array $search): void;
 }

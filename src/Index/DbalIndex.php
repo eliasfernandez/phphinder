@@ -82,7 +82,7 @@ class DbalIndex implements Index
             array_filter([
                 new DoctrineIndex(
                     'primary',
-                    match (true) {
+                    match (true) { /** @phpstan-ignore match.unhandled */
                         in_array(DbalStorage::KEY, $columns) => [DbalStorage::KEY],
                         in_array(DbalStorage::ID, $columns) => [DbalStorage::ID],
                         in_array(DbalStorage::STATE, $columns) => [DbalStorage::STATE],
@@ -92,7 +92,7 @@ class DbalIndex implements Index
                 ),
                 in_array(DbalStorage::STATE, $columns) ? new DoctrineIndex(
                     sprintf('%s_state', $this->tableName),
-                    [DBALStorage::STATE]
+                    [DbalStorage::STATE]
                 ) : null,
             ])
         );

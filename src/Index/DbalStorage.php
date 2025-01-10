@@ -21,6 +21,15 @@ use PHPhinder\Utils\StringHelper;
 
 class DbalStorage extends AbstractStorage implements Storage
 {
+    /** @var DbalIndex  */
+    protected Index $state;
+
+    /** @var DbalIndex */
+    protected Index $docs;
+
+    /** @var array<string, DbalIndex> */
+    protected array $indices = [];
+
     public function __construct(
         private readonly string $connectionString,
         Schema $schema = new DefaultSchema(),
@@ -53,7 +62,7 @@ class DbalStorage extends AbstractStorage implements Storage
     {
         if (!$this->docs->isCreated()) {
             $this->docs->create(array_merge([self::ID], array_keys(
-                array_filter($this->schemaVariables, fn ($var) => $var & Schema::IS_STORED)
+                array_filter($this->schemaVariables, fn ($var) => boolval($var & Schema::IS_STORED))
             )));
         }
 
@@ -136,6 +145,7 @@ class DbalStorage extends AbstractStorage implements Storage
 
     /**
      * @inheritDoc
+     * @param DbalIndex $index
      */
     protected function loadByStates(Index $index, array $states): \Generator
     {

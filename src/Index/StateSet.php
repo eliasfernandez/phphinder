@@ -31,7 +31,7 @@ class StateSet implements StateSetInterface
     private array $new = [];
 
     /**
-     * @var array<int, bool>
+     * @var array<int>
      */
     private array $deleted = [];
 
@@ -52,7 +52,7 @@ class StateSet implements StateSetInterface
     public function all(): array
     {
         $this->initialize();
-        return array_keys($this->states);
+        return array_keys($this->states ?? []);
     }
 
     public function has(int $state): bool

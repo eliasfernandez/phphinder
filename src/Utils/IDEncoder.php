@@ -16,7 +16,8 @@ class IDEncoder
     private const ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
     private const BASE = 62;
 
-    public static function encode(int $number): string {
+    public static function encode(int $number): string
+    {
         if ($number === 0) {
             return self::ALPHABET[0];
         }
@@ -31,7 +32,8 @@ class IDEncoder
         return $result;
     }
 
-    public static function decode(string $encoded): int {
+    public static function decode(string $encoded): int
+    {
         $length = strlen($encoded);
         $number = 0;
 
@@ -43,7 +45,8 @@ class IDEncoder
     }
 
     // Custom comparison function
-    public static function compare(string $a, string $b): int {
+    public static function compare(string $a, string $b): int
+    {
         $decodedA = self::decode($a);
         $decodedB = self::decode($b);
         return $decodedA <=> $decodedB;

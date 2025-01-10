@@ -11,11 +11,12 @@
 
 namespace PHPhinder\Utils;
 
-class StringHelper {
+class StringHelper
+{
     public static function getShortClass(string $className, string $separator = '_'): string
     {
         $separator = strrpos($className, '\\');
-        $className = substr($className,  $separator ? $separator + 1 : 0);
+        $className = substr($className, $separator ? $separator + 1 : 0);
         $simplified = preg_split('/(?<=[a-z])(?=[A-Z])/u', $className);
         if (!is_array($simplified)) {
             throw new \InvalidArgumentException('Class name could not be parsed: ' . $className);
