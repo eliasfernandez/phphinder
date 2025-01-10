@@ -21,6 +21,15 @@ use PHPhinder\Utils\StringHelper;
 
 class DbalStorage extends AbstractStorage implements Storage
 {
+    /** @var DbalIndex  */
+    protected Index $state;
+
+    /** @var DbalIndex */
+    protected Index $docs;
+
+    /** @var array<string, DbalIndex> */
+    protected array $indices = [];
+
     public function __construct(
         private readonly string $connectionString,
         Schema $schema = new DefaultSchema(),
@@ -53,7 +62,7 @@ class DbalStorage extends AbstractStorage implements Storage
     {
         if (!$this->docs->isCreated()) {
             $this->docs->create(array_merge([self::ID], array_keys(
-                array_filter($this->schemaVariables, fn ($var) => $var & Schema::IS_STORED)
+                array_filter($this->schemaVariables, fn ($var) => boolval($var & Schema::IS_STORED))
             )));
         }
 
@@ -90,13 +99,21 @@ class DbalStorage extends AbstractStorage implements Storage
     /**
      * @inheritdoc
      */
-    public function saveStates(array $states): void
+    public function saveStates(array $new, array $deleted): void
     {
-        $this->state->truncate();
-        $this->state->insertMultiple(
-            [DbalStorage::STATE],
-            array_map(fn($state) => [$state], $states)
-        );
+        if (count($new) > 0) {
+            $this->state->insertMultiple(
+                [DbalStorage::STATE],
+                array_map(fn($state) => [$state], $new)
+            );
+        }
+
+        if (count($deleted) > 0) {
+            $this->state->deleteMultiple(
+                DbalStorage::STATE,
+                array_map(fn($state) => [$state], $deleted)
+            );
+        }
     }
 
 
@@ -128,6 +145,7 @@ class DbalStorage extends AbstractStorage implements Storage
 
     /**
      * @inheritDoc
+     * @param DbalIndex $index
      */
     protected function loadByStates(Index $index, array $states): \Generator
     {

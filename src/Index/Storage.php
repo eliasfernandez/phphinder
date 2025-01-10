@@ -47,10 +47,12 @@ interface Storage
     public function saveIndices(string $docId, array $data): void;
 
     /**
-     * Saves an state (if it doesn't exists) on the Storage.
-     * @param array<int> $states
+     * Saves states (if they don't exists) on the Storage, also
+     * removes deleted states.
+     * @param array<int> $new
+     * @param array<int> $deleted
      */
-    public function saveStates(array $states): void;
+    public function saveStates(array $new, array $deleted): void;
 
     /**
      * @return \Generator<int>

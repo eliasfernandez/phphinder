@@ -16,7 +16,7 @@ class SymbolTransformer implements Transformer
     use TransformerTrait;
 
     /** @var array<Filter> */
-    private array $filters=[];
+    private array $filters = [];
 
     public function __construct(string $langIso = 'en', string ...$filters)
     {
