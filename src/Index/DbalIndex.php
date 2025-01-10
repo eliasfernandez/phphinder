@@ -136,6 +136,21 @@ class DbalIndex implements Index
         );
     }
 
+    public function deleteMultiple(string $key, array $data): void
+    {
+        $this->conn->executeStatement(
+            sprintf(
+                'DELETE FROM %s WHERE %s in %s',
+                $this->tableName,
+                $key,
+                implode(', ', array_map(
+                    fn (array $row) => '(' . implode(', ', $row) . ')',
+                    $data
+                ))
+            )
+        );
+    }
+
     public function truncate(): void
     {
         $this->conn->executeStatement(

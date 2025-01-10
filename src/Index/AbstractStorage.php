@@ -94,7 +94,7 @@ abstract class AbstractStorage implements Storage
         $this->save($this->docs, [self::ID => $docId], $doc);
     }
 
-    abstract public function saveStates(array $states): void;
+    abstract public function saveStates(array $new, array $deleted): void;
 
     public function loadDocument(string|int $docId): array
     {

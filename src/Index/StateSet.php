@@ -24,6 +24,17 @@ class StateSet implements StateSetInterface
      */
     private ?array $states = null;
 
+
+    /**
+     * @var array<int>
+     */
+    private array $new = [];
+
+    /**
+     * @var array<int, bool>
+     */
+    private array $deleted = [];
+
     public function __construct(private Storage $storage)
     {
     }
@@ -32,7 +43,10 @@ class StateSet implements StateSetInterface
     public function add(int $state): void
     {
         $this->initialize();
-        $this->states[$state] = true;
+        if (!$this->has($state)) {
+            $this->new[] = $state;
+            $this->states[$state] = true;
+        }
     }
 
     public function all(): array
@@ -50,13 +64,18 @@ class StateSet implements StateSetInterface
     public function remove(int $state): void
     {
         $this->initialize();
-        unset($this->states[$state]);
+        if ($this->has($state)) {
+            $this->deleted[] = $state;
+            unset($this->states[$state]);
+        }
     }
 
     public function persist(): void
     {
         $this->initialize();
-        $this->storage->saveStates(array_keys($this->states));
+        $this->storage->saveStates($this->new, $this->deleted);
+        $this->new = [];
+        $this->deleted = [];
     }
 
     private function initialize(): void

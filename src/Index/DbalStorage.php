@@ -90,13 +90,21 @@ class DbalStorage extends AbstractStorage implements Storage
     /**
      * @inheritdoc
      */
-    public function saveStates(array $states): void
+    public function saveStates(array $new, array $deleted): void
     {
-        $this->state->truncate();
-        $this->state->insertMultiple(
-            [DbalStorage::STATE],
-            array_map(fn($state) => [$state], $states)
-        );
+        if (count($new) > 0) {
+            $this->state->insertMultiple(
+                [DbalStorage::STATE],
+                array_map(fn($state) => [$state], $new)
+            );
+        }
+
+        if (count($deleted) > 0) {
+            $this->state->deleteMultiple(
+                DbalStorage::STATE,
+                array_map(fn($state) => [$state], $deleted)
+            );
+        }
     }
 
 

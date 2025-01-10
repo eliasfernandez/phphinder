@@ -91,18 +91,18 @@ class JsonStorage extends AbstractStorage implements Storage
     /**
      * @inheritdoc
      */
-    public function saveStates(array $states): void
+    public function saveStates(array $new, array $deleted): void
     {
-        ftruncate($this->state->getHandler(), 0);
-
         $this->state->lock();
-        foreach ($states as $state) {
-            $this->state->write(str_pad(
-                sprintf('{"s":%s}', $state),
-                $this->state->getLength() - 1
-            ) . PHP_EOL);
+        foreach ($new as $state) {
+            $this->save($this->state, [self::STATE => $state], [self::STATE => $state]);
+        }
+
+        foreach ($deleted as $state) {
+            $this->remove($this->state, [self::STATE => $state]);
         }
         $this->state->unlock();
+
     }
 
     /**
