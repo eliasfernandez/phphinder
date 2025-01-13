@@ -17,14 +17,14 @@ class RedisIndex implements Index
 {
     private Client $client;
 
-    /**
-     * @var array<string>
-     */
-    private array $properties;
-    private string $key;
+    private readonly string $key;
 
-    public function __construct(string $connectionString, private readonly string $pattern, private readonly int $schemaOptions = 0)
+    /**
+     * @param array<string> $properties
+     */
+    public function __construct(string $connectionString, private readonly string $pattern, private readonly array $properties, private readonly int $schemaOptions = 0)
     {
+        $this->key = $properties[0];
         $this->client = new Client($connectionString);
     }
 
@@ -38,18 +38,12 @@ class RedisIndex implements Index
 
     public function isCreated(): bool
     {
-        return true;
+        return !$this->isEmpty();
     }
 
     public function isEmpty(): bool
     {
         return $this->getTotal() === 0;
-    }
-
-    public function create(array $properties): void
-    {
-        $this->key = $properties[0];
-        $this->properties = $properties;
     }
 
     public function drop(): void

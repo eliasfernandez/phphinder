@@ -37,10 +37,12 @@ class RedisStorage extends AbstractStorage implements Storage
         Schema $schema = new DefaultSchema(),
         Tokenizer $tokenizer = new RegexTokenizer()
     ) {
-        $this->docs = new RedisIndex($connectionString, sprintf('%s:%s', StringHelper::getShortClass($schema::class), 'docs'));
-        $this->state = new RedisIndex($connectionString, sprintf('%s:%s', StringHelper::getShortClass($schema::class), 'states'));
-
         parent::__construct($schema, $tokenizer);
+
+        $this->docs = new RedisIndex($connectionString, sprintf('%s:%s', StringHelper::getShortClass($schema::class), 'docs'), array_merge([self::ID], array_keys(
+            array_filter($this->schemaVariables, fn ($var) => boolval($var & Schema::IS_STORED))
+        )));
+        $this->state = new RedisIndex($connectionString, sprintf('%s:%s', StringHelper::getShortClass($schema::class), 'states'), [self::STATE]);
 
         /**
          * @var string $name
@@ -51,9 +53,14 @@ class RedisStorage extends AbstractStorage implements Storage
                 throw new StorageException(sprintf('The schema provided contains a property with the reserved name %s', self::ID));
             }
             if ($options & Schema::IS_INDEXED) {
+                $properties = [self::KEY, 'ids', self::STATE];
+                if ($options & Schema::IS_UNIQUE) {
+                    unset($properties[2]);
+                }
                 $this->indices[$name] = new RedisIndex(
                     $this->connectionString,
                     sprintf('%s:%s', StringHelper::getShortClass($schema::class), $name),
+                    $properties,
                     $options
                 );
             }
@@ -62,18 +69,7 @@ class RedisStorage extends AbstractStorage implements Storage
 
     public function initialize(): void
     {
-        $this->docs->create(array_merge([self::ID], array_keys(
-            array_filter($this->schemaVariables, fn ($var) => boolval($var & Schema::IS_STORED))
-        )));
-        $this->state->create([self::STATE]);
-
-        foreach ($this->indices as $index) {
-            $columns = [self::KEY, 'ids', self::STATE];
-            if ($index->getSchemaOptions() & Schema::IS_UNIQUE) {
-                unset($columns[2]);
-            }
-            $index->create($columns);
-        }
+        // ignore for redis
     }
 
 
