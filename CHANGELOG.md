@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
-## [0.1.5-beta] - 2025-01-10
+## [0.1.5-beta] - 2025-01-13
 ### Added
 - Add Redis Support, using the popular library `predis/predis`, adds support to use Redis as the search Storage.
   * `RedisIndex`
