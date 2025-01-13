@@ -3,6 +3,7 @@
 namespace Tests;
 
 use PHPhinder\Index\DbalStorage;
+use PHPhinder\Index\RedisStorage;
 use PHPhinder\Index\Storage;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -187,7 +188,14 @@ class SearchEngineTest extends TestCase
         ), new RegexTokenizer());
         $dbalEngine = self::createSearchEngine($storage);
 
+        $storage = new RedisStorage('tcp://127.0.0.1:6379', new TestSchema(
+            new LowerCaseTransformer('en', StopWordsFilter::class),
+            new StemmerTransformer('en')
+        ), new RegexTokenizer());
+        $redisEngine = self::createSearchEngine($storage);
+
         return [
+            'redis' => [$redisEngine],
             'json' => [$jsonEngine],
             'dbal' => [$dbalEngine],
         ];

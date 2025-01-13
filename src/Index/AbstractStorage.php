@@ -193,7 +193,6 @@ abstract class AbstractStorage implements Storage
             }
             $ids = array_merge($ids, explode(',', $doc['ids']));
         }
-
         return $ids;
     }
 

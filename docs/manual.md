@@ -17,7 +17,7 @@ $engine->search('Hello OR Hi');
 
 ## Storage
 
-Storage is an interface with defined methods that allow the `SearchEngine` to interact with stored data. Currently, `JsonStorage` and `DbalStorage` are implemented. Future plans include other options like `RedisStorage`.
+Storage is an interface with defined methods that allow the `SearchEngine` to interact with stored data. Currently, `JsonStorage`, `DbalStorage` and `RedisStorage` are implemented. Future plans include other options.
 
 ### JsonStorage Usage
 
@@ -77,6 +77,31 @@ This setup creates the necessary document and index tables in an existing databa
         PRIMARY KEY (k)
     );
 ```
+
+### RedisStorage Usage
+
+`RedisStorage` uses the[Predis](https://github.com/predis/predis) package to store the data. 
+
+```php
+use PHPhinder\Index\RedisStorage;
+use PHPhinder\SearchEngine;
+
+$storage = new RedisStorage('tcp://127.0.0.1:6379');
+$engine = new SearchEngine($storage);
+```
+
+This setup creates the hash (prefixed with `phphinder:`), keys and values on the Redis engine. By instance, for a Schema called TestSchema: 
+
+```
+phphinder
+└── test_schema:
+    ├── _id
+    ├── docs
+    ├── states
+    ├── text
+    └── title
+```
+
 
 ## Schema
 
