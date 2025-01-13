@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [0.1.5-beta] - 2025-01-10
+### Added
+- Add Redis Support, using the popular library `predis/predis`, adds support to use Redis as the search Storage.
+  * `RedisIndex`
+  * `RedisStorage`
+- Add this CHANGELOG
+
+## [0.1.4-beta] - 2025-01-10
+### Changed
+- Improve performance state index updates by using incremental updates
+- Some cleaning and refactor assisted by phpstan and phpcs
+
+## [0.1.3-beta] - 2025-01-08
+### Added
+Typo tolerance searches
+
+### Fixed
+Issue with string containing "0"
+
+
+
 ## [0.1.0-beta] - 2025-01-01
 ### Added
 
