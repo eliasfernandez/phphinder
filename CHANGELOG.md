@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [0.1.6-beta] - 2025-01-19
+### Added
+`UpsertQueryProvider` for PostgreSQL, MySQL (and MariaDB) and SQLite.
+
+### Fixed
+When running multiple threads to update the index instead of failing on duplicate keys collision, will update with the new value.
+
+
 ## [0.1.5-beta] - 2025-01-13
 ### Added
 - Add Redis Support, using the popular library `predis/predis`, adds support to use Redis as the search Storage.
