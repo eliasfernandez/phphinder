@@ -14,6 +14,12 @@ namespace PHPhinder\Index;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Exception;
+use Doctrine\DBAL\Platforms\MariaDBPlatform;
+use Doctrine\DBAL\Platforms\MySQL80Platform;
+use Doctrine\DBAL\Platforms\MySQLPlatform;
+use Doctrine\DBAL\Platforms\PostgreSQL120Platform;
+use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
+use Doctrine\DBAL\Platforms\SqlitePlatform;
 use Doctrine\DBAL\Schema\Column;
 use Doctrine\DBAL\Schema\Index as DoctrineIndex;
 use Doctrine\DBAL\Schema\Table;
@@ -21,11 +27,14 @@ use Doctrine\DBAL\Tools\DsnParser;
 use Doctrine\DBAL\Types\IntegerType;
 use Doctrine\DBAL\Types\StringType;
 use Doctrine\DBAL\Types\TextType;
+use PHPhinder\Index\Dbal\MariaDbUpsertQueryProvider;
+use PHPhinder\Index\Dbal\PostgreSQLUpsertQueryProvider;
+use PHPhinder\Index\Dbal\SqliteUpsertQueryProvider;
+use PHPhinder\Index\Dbal\UpsertQueryProviderInterface;
 
 class DbalIndex implements Index
 {
-    /** @var Connection $handler */
-    private $conn;
+    private Connection $conn;
 
     public function __construct(string $connectionString, private readonly string $tableName, private readonly int $schemaOptions = 0)
     {
@@ -124,15 +133,7 @@ class DbalIndex implements Index
         }
 
         $this->conn->executeStatement(
-            sprintf(
-                'INSERT INTO %s (%s) VALUES %s',
-                $this->tableName,
-                implode(', ', $columns),
-                implode(', ', array_map(
-                    fn (array $row) => '(' . implode(', ', $row) . ')',
-                    $data
-                ))
-            )
+            ($this->getUpsertQueryProvider())->getUpsertBatchQuery($this->tableName, $columns, $data)
         );
     }
 
@@ -203,5 +204,15 @@ class DbalIndex implements Index
     public function getSchemaOptions(): int
     {
         return $this->schemaOptions;
+    }
+
+    private function getUpsertQueryProvider(): UpsertQueryProviderInterface
+    {
+        return match (get_class($this->conn->getDatabasePlatform())) {
+            MySQLPlatform::class, MySQL80Platform::class, MariaDBPlatform::class => new MariaDbUpsertQueryProvider($this->conn),
+            PostgreSQLPlatform::class, PostgreSQL120Platform::class => new PostgreSQLUpsertQueryProvider($this->conn),
+            SqlitePlatform::class => new SqliteUpsertQueryProvider($this->conn),
+            default => null
+        };
     }
 }
