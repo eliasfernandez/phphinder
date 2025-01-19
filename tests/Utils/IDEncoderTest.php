@@ -2,13 +2,13 @@
 
 namespace Tests\Utils;
 
-
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use PHPhinder\Utils\IDEncoder;
 
 #[CoversClass(IDEncoder::class)]
-class IDEncoderTest extends TestCase {
+class IDEncoderTest extends TestCase
+{
     public function testEncode(): void
     {
         $this->assertEquals('0', IDEncoder::encode(0));

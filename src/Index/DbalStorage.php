@@ -12,6 +12,7 @@
 namespace PHPhinder\Index;
 
 use Doctrine\DBAL\ArrayParameterType;
+use PHPhinder\Exception\QueryException;
 use PHPhinder\Exception\StorageException;
 use PHPhinder\Schema\DefaultSchema;
 use PHPhinder\Schema\Schema;
@@ -102,10 +103,14 @@ class DbalStorage extends AbstractStorage implements Storage
     public function saveStates(array $new, array $deleted): void
     {
         if (count($new) > 0) {
-            $this->state->insertMultiple(
-                [DbalStorage::STATE],
-                array_map(fn($state) => [$state], $new)
-            );
+            try {
+                $this->state->insertMultiple(
+                    [DbalStorage::STATE],
+                    array_map(fn($state) => [$state], $new)
+                );
+            } catch (\Exception $e) {
+                throw new QueryException('There was an error while saving states.', 0, $e);
+            }
         }
 
         if (count($deleted) > 0) {
