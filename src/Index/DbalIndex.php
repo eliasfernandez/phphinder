@@ -85,7 +85,7 @@ class DbalIndex implements Index
                     DbalStorage::ID, DbalStorage::KEY => new StringType(),
                     DbalStorage::STATE => new IntegerType(),
                     default => new TextType(),
-                }),
+                }, ['notnull' => false]),
                 $columns
             ),
             array_filter([
