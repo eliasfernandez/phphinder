@@ -108,7 +108,7 @@ abstract class AbstractStorage implements Storage
     public function saveIndices(string $docId, array $data): void
     {
         foreach ($this->schemaVariables as $name => $options) {
-            if ($options & Schema::IS_INDEXED) {
+            if ($options & Schema::IS_INDEXED && isset($data[$name])) {
                 $tokens = $this->tokenizer->apply($data[$name]);
                 foreach ($tokens as $token) {
                     if (~$options & Schema::IS_UNIQUE) {
