@@ -177,6 +177,9 @@ $engine->search('title:hello (world OR other:foo*)');
 
 // Excludes "world": Searches for "hello" in title but NOT ("world" or "foo*" in "other").
 $engine->search('title:hello NOT(world OR other:foo*)');
+
+// Finds documents containing both "hello world" in this exact order.
+$engine->search('title:"hello world")');
 ```
 
 This query language is powerful, flexible, and easy to use. Future updates may include configurable boost levels for terms.

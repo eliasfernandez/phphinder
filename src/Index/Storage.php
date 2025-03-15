@@ -110,6 +110,20 @@ interface Storage
      */
     public function findDocIdsByPrefix(string $prefix, ?string $index = null): array;
 
+    /**
+     * Given a text (including whitespaces), gets the doc ids by index in the form of an associative array with
+     * this shape:
+     *
+     * [
+     *     index1 => [ '1', '2', ... 'Z'],
+     *     ...,
+     *     indexN => [ '1', '2', ... 'Z'],
+     * ]
+     *
+     * @return array<string, array<string>>
+     */
+    public function findDocIdsByFullText(string $text, ?string $index = null): array;
+
 
     /**
      * Looks for the document id on `index` for the search `term` :

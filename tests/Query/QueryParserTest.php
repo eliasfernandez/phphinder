@@ -3,6 +3,7 @@
 namespace Tests\Query;
 
 use Couchbase\QueryException;
+use PHPhinder\Query\FullTextQuery;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use PHPhinder\Query\AndQuery;
@@ -127,14 +128,26 @@ class QueryParserTest extends TestCase
         $this->assertEquals($expected, $query);
     }
 
+    public function testParseFullTextQuery(): void
+    {
+        $query = $this->parser->parse('"Animal instict"');
+        $expected = new FullTextQuery("*", 'Animal instict');
+
+        $this->assertEquals($expected, $query);
+    }
+
     public function testParseTypesStringCast(): void
     {
+        $this->assertEquals('(*:hello AND *:world)', $this->parser->parse("'hello world'"));
         $this->assertEquals('(NOT(*:hello) AND *:world)', $this->parser->parse("NOT(hello) world")->toString());
         $this->assertEquals('((*:world OR other:foo*) AND NOT(title:hello))', $this->parser->parse("(world OR other:foo*) AND NOT(title:hello)")->toString());
 
         $this->assertEquals('<null> Empty Query', $this->parser->parse("")->toString());
         $this->assertEquals('*:hello', $this->parser->parse("hello"));
         $this->assertEquals('(*:hello AND *:world)', $this->parser->parse("hello world"));
+        $this->assertEquals('*:"hello world"', $this->parser->parse('"hello world"'));
+        $this->assertEquals('(*:hello AND *:world)', $this->parser->parse('hello world"'));
+        $this->assertEquals('(*:hello AND *:world)', $this->parser->parse('"hello world'));
         $this->assertEquals('(title:hello AND (*:world OR other:foo*))', $this->parser->parse("title:hello (world OR other:foo*)"));
 
         $this->assertEquals('((*:world OR other:foo*) AND NOT(title:hello))', $this->parser->parse(

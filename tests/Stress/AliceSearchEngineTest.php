@@ -98,6 +98,7 @@ class AliceSearchEngineTest extends TestCase
             ['gryphon', 0.15, 55],
             ['griphon', 0.15, 55],
             ['winder', 0.3, 35], //winter, wander, wider, wonder
+            ['"“I advise you to leave off this minute!”"', 0.2, 1],
         ];
     }
 }

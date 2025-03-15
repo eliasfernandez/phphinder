@@ -11,32 +11,18 @@
 
 namespace PHPhinder\Query;
 
-abstract class TextQuery extends Query
+final class FullTextQuery extends TextQuery
 {
     public function __construct(
         protected readonly string $field,
         protected string $value,
         protected float $boost = 1.0,
     ) {
-    }
-
-    public function getField(): string
-    {
-        return $this->field;
-    }
-
-    public function getValue(): string
-    {
-        return $this->value;
-    }
-
-    public function getBoost(): float
-    {
-        return $this->boost;
+        $this->value = str_replace('"', '', $value);
     }
 
     public function toString(): string
     {
-        return "{$this->field}:{$this->value}";
+        return "{$this->field}:\"{$this->value}\"";
     }
 }

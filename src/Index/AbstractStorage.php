@@ -289,6 +289,42 @@ abstract class AbstractStorage implements Storage
     }
 
 
+    /**
+     * @return array<string, array<string>>
+     */
+    protected function loadFulltextIndices(string $text): array
+    {
+        $indexedVariables = array_filter(
+            $this->schemaVariables,
+            fn(int $options) => $options & Schema::IS_STORED && $options & Schema::IS_FULLTEXT
+        );
+        if (count($indexedVariables) === 0) {
+            return [];
+        }
+
+        $indices = [];
+        foreach ($indexedVariables as $name => $_) {
+            $indices[$name] = array_map(
+                fn (array $doc) => $doc['id'],
+                iterator_to_array($this->loadFulltext([$name => $text]))
+            );
+        }
+
+        return $indices;
+    }
+
+    /**
+     * @return array<string>
+     */
+    protected function loadFulltextIndex(string $name, string $text): array
+    {
+        return array_map(
+            fn (array $doc) => $doc['id'],
+            iterator_to_array($this->loadFulltext([$name => $text]))
+        );
+    }
+
+
     protected function transform(string $term): ?string
     {
         foreach ($this->schema->getTransformers() as $transformer) {
@@ -397,9 +433,29 @@ abstract class AbstractStorage implements Storage
     }
 
     /**
+     * @return array<string, array<string>>
+     */
+    public function findDocIdsByFulltext(string $text, ?string $index = null): array
+    {
+        $this->open();
+        $indices = $index ? [$text => $this->loadFulltextIndex($index, $text)] : $this->loadFulltextIndices($text);
+        $this->commit();
+
+        return $indices;
+    }
+
+    /**
      * @param array<string, string> $search
      */
     abstract protected function loadPrefix(Index $index, array $search): \Generator;
+
+    /**
+     * @param array<string, string> $search
+     */
+    protected function loadFulltext(array $search): \Generator
+    {
+        return $this->docs->findContaining($search);
+    }
 
     abstract public function initialize(): void;
 

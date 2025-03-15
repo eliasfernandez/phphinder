@@ -14,6 +14,7 @@ namespace PHPhinder;
 use PHPhinder\Exception\StorageException;
 use PHPhinder\Index\Storage;
 use PHPhinder\Query\AndQuery;
+use PHPhinder\Query\FullTextQuery;
 use PHPhinder\Query\NotQuery;
 use PHPhinder\Query\OrQuery;
 use PHPhinder\Query\PrefixQuery;
@@ -197,6 +198,26 @@ class SearchEngine
         return $this->attachDocuments($termByIndex, $docs);
     }
 
+
+    /**
+     * @param array<Result> $docs
+     * @return array<Result>
+     */
+    private function searchFullText(FullTextQuery $query, array $docs): array
+    {
+        $termByIndex = [];
+
+        $termByIndex[$query->getValue()] = $this->storage->findDocIdsByFullText(
+            $query->getValue(),
+            self::ANY_SYMBOL !== $query->getField() ? $query->getField() : null
+        );
+
+        return $this->assignFulltextMatch(
+            $this->attachDocuments($termByIndex, $docs),
+            $query->getValue()
+        );
+    }
+
     /**
      * @param array<Result> $docs
      * @return array<Result>
@@ -209,6 +230,7 @@ class SearchEngine
             $query instanceof TermQuery => $this->searchTerm($query, $docs),
             $query instanceof NotQuery => $this->searchNot($query->getSubquery(), $docs, $phrase),
             $query instanceof PrefixQuery => $this->searchPrefix($query, $docs),
+            $query instanceof FullTextQuery => $this->searchFullText($query, $docs),
             default => $docs
         };
     }
@@ -248,7 +270,7 @@ class SearchEngine
     {
         foreach ($this->storage->getSchemaVariables() as $name => $options) {
             if ($options & Schema::IS_FULLTEXT) {
-                foreach ($docs as $key => $doc) {
+                foreach ($docs as $doc) {
                     if (!isset($doc->getDocument()[$name])) {
                         throw new StorageException(
                             sprintf('Field `%s` is declared as fulltext but not stored.', $name)

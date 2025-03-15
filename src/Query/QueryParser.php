@@ -45,11 +45,37 @@ class QueryParser
         if ('' === trim($query)) {
             return [];
         }
-        $tokens =  preg_split('/(\s+|OR|NOT\(|AND|\(|\)|\w+\*|\w+:\w+\*|\w+:\w+)/', $query, -1, PREG_SPLIT_NO_EMPTY | PREG_SPLIT_DELIM_CAPTURE);
+        $tokens =  preg_split('/(\s+|OR|NOT\(|AND|\(|\)|\w+\*|"[^"]+"|\w+:\w+\*|\w+:\w+|\w+:"[^"]+")/', $query, -1, PREG_SPLIT_NO_EMPTY | PREG_SPLIT_DELIM_CAPTURE);
         if (!$tokens) {
             throw new QueryException('Something went wrong trying to tokenize the query');
         }
-        return array_values(array_filter($tokens, fn ($token) => trim($token) !== '' && trim($token) !== 'AND'));
+
+        return array_values(
+            array_filter(
+                array_map(
+                    [$this, 'cleanToken'],
+                    $tokens
+                ),
+                fn ($token) => $token !== '' && $token !== 'AND'
+            )
+        );
+    }
+
+    private function cleanToken(string $token): string
+    {
+        $token = trim($token);
+
+        // Remove any non word character except double quotes
+        $token = preg_replace('/[^\w":()* ]/', '', $token);
+
+        // there is an even number of double quotes '"' => 34
+        $chars = count_chars($token, 1);
+        if (isset($chars[34]) && $chars[34] % 2 !== 0) {
+            $pos = strrpos($token, '"');
+            $token = substr_replace($token, '', $pos, 1);
+        }
+
+        return $token;
     }
 
     /**
@@ -64,6 +90,7 @@ class QueryParser
         $subqueries = [];
         while ($pointer < count($tokens)) {
             $token = trim($tokens[$pointer]);
+
             if ($token === '(' || $token === 'NOT(') {
                 // Handle opening parenthesis: Parse a subquery recursively
                 $originalPointer = $pointer;
@@ -85,11 +112,16 @@ class QueryParser
             } elseif (preg_match('/^(\w+)\*$/', $token, $matches)) {
                 // Handle PrefixQuery (e.g., term*)
                 $subqueries[] = new PrefixQuery($this->fieldName, $matches[1]);
+            } elseif (preg_match('/^"([^"]+)"$/', $token, $matches)) {
+                // Handle FullTextQuery (e.g., "more than one word")
+                $subqueries[] = new FullTextQuery($this->fieldName, $matches[1]);
             } elseif (str_contains($token, ':')) {
                 // Handle fielded query (e.g., field:value)
                 [$field, $value] = explode(':', $token, 2);
                 if (preg_match('/^(\w+)\*$/', $value, $matches)) {
                     $subqueries[] = new PrefixQuery($field, $matches[1]);
+                } else if (preg_match('/^"([^"]+)"$/', $value, $matches)) {
+                    $subqueries[] = new FullTextQuery($field, $matches[1]);
                 } else {
                     $subqueries[] = new TermQuery($field, $value);
                 }

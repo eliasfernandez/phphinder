@@ -69,7 +69,10 @@ class RedisStorage extends AbstractStorage implements Storage
 
     public function initialize(): void
     {
-        // ignore for redis
+        $fullTextVariables = array_filter($this->schemaVariables, fn ($var) => $var & Schema::IS_STORED && $var & Schema::IS_FULLTEXT);
+        if (count($fullTextVariables) > 0) {
+            $this->docs->addFulltextFields(array_keys($fullTextVariables));
+        }
     }
 
 
