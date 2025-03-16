@@ -11,4 +11,6 @@ interface Index
     public function drop(): void;
 
     public function getSchemaOptions(): int;
+
+    public function findContaining(array $search, array $fields = ['id']): \Generator;
 }

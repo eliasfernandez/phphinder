@@ -156,6 +156,18 @@ class JsonStorage extends AbstractStorage implements Storage
     }
 
     /**
+     * @param array<string, string> $search
+     */
+    protected function loadFulltext(array $search): \Generator
+    {
+        try {
+            \exec('which grep');
+            return $this->docs->findContaining($search);
+        } catch (\Throwable $_) {
+        }
+    }
+
+    /**
      * @inheritDoc
      * @param FileIndex $index
      */

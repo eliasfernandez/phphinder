@@ -171,6 +171,18 @@ class SearchEngineTest extends TestCase
         $this->assertFalse($results[2]->isFulltext());
     }
 
+
+    #[DataProvider('searchEnginesProvider')]
+    public function testSearchFulltext(SearchEngine $engine): void
+    {
+        $results = $engine->search('"search engine"');
+
+        $this->assertCount(2, $results);
+        $this->assertCount(1, $results[1]->getTerms());
+        $this->assertCount(1, $results[1]->getIndices());
+        $this->assertTrue($results[1]->isFulltext());
+    }
+
     /**
      * @return array<string, array<SearchEngine>>
      */

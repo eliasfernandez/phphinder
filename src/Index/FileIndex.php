@@ -153,6 +153,21 @@ class FileIndex implements Index
         unlink($this->getTemporalPath());
     }
 
+    public function findContaining(array $search, array $fields = ['id']): \Generator
+    {
+        \exec(sprintf('grep -i "%s" %s', preg_quote(current($search)), $this->path), $lines, $code);
+        if ($code !== 0) {
+            throw new FileIndexException('Executing grep failed.');
+        }
+
+        foreach ($lines as $line) {
+            $document = \json_decode($line, true, 512, JSON_THROW_ON_ERROR);
+            if (isset($document[key($search)]) && str_contains($document[key($search)], current($search))) {
+                yield array_intersect_key($document, array_flip($fields));
+            }
+        }
+    }
+
     private function getTemporalPath(): string
     {
         return sprintf('%s.2', $this->path);

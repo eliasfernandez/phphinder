@@ -196,6 +196,26 @@ class DbalIndex implements Index
         }
     }
 
+    /**
+     * @param array<string, string> $search
+     */
+    public function findContaining(array $search, array $fields = ['id']): \Generator
+    {
+        $stmt = $this->conn->executeQuery(
+            sprintf(
+                "SELECT %s FROM %s WHERE %s LIKE '%%%s%%'",
+                implode(', ', $fields),
+                $this->tableName,
+                key($search),
+                current($search)
+            )
+        );
+
+        while (($row = $stmt->fetchAssociative()) !== false) {
+            yield $row;
+        }
+    }
+
     public function getTotal(): int
     {
         return intval($this->conn->fetchOne(sprintf('SELECT COUNT(id) FROM %s', $this->tableName)));
