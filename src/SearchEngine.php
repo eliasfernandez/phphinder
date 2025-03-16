@@ -270,13 +270,14 @@ class SearchEngine
     {
         foreach ($this->storage->getSchemaVariables() as $name => $options) {
             if ($options & Schema::IS_FULLTEXT) {
+                if (boolval($options & Schema::IS_STORED) === false) {
+                    throw new StorageException(
+                        sprintf('Field `%s` is declared as fulltext but not stored.', $name)
+                    );
+                }
+
                 foreach ($docs as $doc) {
-                    if (!isset($doc->getDocument()[$name])) {
-                        throw new StorageException(
-                            sprintf('Field `%s` is declared as fulltext but not stored.', $name)
-                        );
-                    }
-                    if (!is_string($doc->getDocument()[$name])) {
+                    if (!isset($doc->getDocument()[$name]) || !is_string($doc->getDocument()[$name])) {
                         continue;
                     }
                     $doc->setFulltext(str_contains($doc->getDocument()[$name], $phrase));
