@@ -196,6 +196,18 @@ class DbalIndex implements Index
         }
     }
 
+    public function findPrefix(array $search): \Generator
+    {
+        $stmt = $this->conn->executeQuery(
+            sprintf('SELECT * FROM %s WHERE %s LIKE ?', $this->tableName, key($search)),
+            array_values($search)
+        );
+
+        while (($row = $stmt->fetchAssociative()) !== false) {
+            yield $row;
+        }
+    }
+
     /**
      * @param array<string, string> $search
      */

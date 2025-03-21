@@ -97,6 +97,16 @@ class DbalStorage extends AbstractStorage implements Storage
         return $this->docs->getTotal();
     }
 
+
+    public function getDocuments(array $docIds): \Generator
+    {
+        $this->open();
+        foreach ($this->loadDocs($docIds) as $doc) {
+            yield [$doc['id'], $doc];
+        }
+        $this->commit();
+    }
+
     /**
      * @inheritdoc
      */
@@ -134,10 +144,18 @@ class DbalStorage extends AbstractStorage implements Storage
     /**
      * @param DbalIndex $index
      */
+    protected function loadDocs(array $search): \Generator
+    {
+        return $this->docs->findAll(['id' => $search], [ArrayParameterType::STRING]);
+    }
+
+    /**
+     * @param DbalIndex $index
+     */
     protected function loadPrefix(Index $index, array $search): \Generator
     {
         $search[key($search)] = current($search) . '%';
-        return $index->findAll($search);
+        return $index->findPrefix($search);
     }
 
     /**

@@ -191,6 +191,7 @@ abstract class AbstractStorage implements Storage
             if (Levenshtein::distance($term, $doc['k']) > $levenshteinDistance) {
                 continue;
             }
+
             $ids = array_merge($ids, explode(',', $doc['ids']));
         }
         return $ids;
@@ -412,6 +413,7 @@ abstract class AbstractStorage implements Storage
             $index => $this->loadIndexWithTypoTolerance($index, $term)
         ] : $this->loadIndicesWithTypoTolerance($term);
         $this->commit();
+
         return $indices;
     }
 

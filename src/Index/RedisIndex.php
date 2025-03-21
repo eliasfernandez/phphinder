@@ -11,50 +11,24 @@
 
 namespace PHPhinder\Index;
 
+use PHPhinder\Transformer\StopWordsFilter;
 use Predis\Client;
-use Predis\Command\Argument\Search\CreateArguments;
-use Predis\Command\Argument\Search\SchemaFields\TextField;
 use Predis\Command\Argument\Search\SearchArguments;
 
 class RedisIndex implements Index
 {
-    private Client $client;
-
     private readonly string $key;
-
-
-    private array $fulltextFields = [];
 
     /**
      * @param array<string> $properties
      */
-    public function __construct(string $connectionString, private readonly string $pattern, private readonly array $properties, private readonly int $schemaOptions = 0)
+    public function __construct(private readonly Client $client, private readonly string $pattern, private readonly array $properties, private readonly int $schemaOptions = 0)
     {
         $this->key = $properties[0];
-        $this->client = new Client($connectionString);
-    }
-
-    public function addFulltextFields(array $fields): void
-    {
-        $this->fulltextFields = $fields;
     }
 
     public function open(): void
     {
-        if (count($this->fulltextFields) === 0) {
-            return;
-        }
-
-        try {
-            $this->client->ftinfo('fulltext');
-        } catch (\Exception $_) {
-            $this->client->ftdropindex('fulltext');
-            $this->client->ftcreate(
-                'fulltext',
-                array_map(fn (string $field) => new TextField($field), $this->fulltextFields),
-                (new CreateArguments())->prefix([sprintf('phphinder:%s:', $this->pattern)])
-            );
-        }
     }
 
     public function close(): void
@@ -131,36 +105,57 @@ class RedisIndex implements Index
     {
         if (null === $search) {
             $results = $this->client->keys(sprintf('phphinder:%s:*', $this->pattern));
-            $search = [$this->key => array_map(fn (string $pattern) =>
-                str_replace(
-                    sprintf('phphinder:%s:', $this->pattern),
-                    '',
-                    $pattern
-                ), $results)];
+            $search = [$this->key => $results];
         }
 
         foreach ($search[$this->key] as $value) {
-            yield $this->client->hgetall(sprintf('phphinder:%s:%s', $this->pattern, $value));
+            yield $this->parseResult($this->client->hgetall($value));
+        }
+    }
+
+    private function parseResult(array $result): array
+    {
+        foreach ($result as $key => $value) {
+            if ($key === RedisStorage::STATE) {
+                $result[$key] = intval($value);
+            }
+        }
+
+        return $result;
+    }
+
+    public function findPrefix(array $search): \Generator
+    {
+        $searchPattern = str_replace('%', '', current($search));
+        $results = $this->client->keys(sprintf('phphinder:%s:%s*', $this->pattern, $searchPattern));
+
+        foreach ($results as $value) {
+            yield $this->client->hgetall($value);
         }
     }
 
     /**
+     * Regarding https://redis.io/docs/latest/develop/interact/search-and-query/query/exact-match/
+     * we can't use a phrase that starts with a stop word.
+     *
      * @param array<string, string> $search
      */
     public function findContaining(array $search, array $fields = ['id']): \Generator
     {
-        foreach ($search as $key => $value) {
-            $result = $this->client->ftsearch(
-                'fulltext',
-                sprintf("@%s:(%s)", $key, $value),
-                (new SearchArguments())->noContent()
-            );
+        $key = key($search);
+        $value = current($search);
+        $command = [
+            'FT.SEARCH',
+            sprintf('%s.%s', str_replace(':docs', '', $this->pattern), RedisStorage::FT_NS_NANE),
+            sprintf('@%s:("%s")', $key, $value),
+            'NOCONTENT'
+        ];
+        $result = $this->client->executeRaw($command);
 
-            if (count($result) > 0) {
-                array_shift($result);
-                foreach ($result as $item) {
-                    yield ['id' => str_replace(sprintf('phphinder:%s:', $this->pattern), '', $item)];
-                }
+        if (count($result) > 0) {
+            array_shift($result);
+            foreach ($result as $item) {
+                yield ['id' => str_replace(sprintf('phphinder:%s:', $this->pattern), '', $item)];
             }
         }
     }
