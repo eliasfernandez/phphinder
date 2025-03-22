@@ -19,6 +19,12 @@ use PHPhinder\Transformer\SymbolTransformer;
 #[CoversClass(SearchEngine::class)]
 class AliceSearchEngineTest extends TestCase
 {
+    protected static array $truncated = [
+        'json' => false,
+        'dbal' => false,
+        'redis' => false,
+    ];
+
     public function setUpSearchEngine(string $type): SearchEngine
     {
         $storage = match ($type) {
@@ -26,6 +32,11 @@ class AliceSearchEngineTest extends TestCase
             'dbal' => $this->getDbalStorage(),
             'redis' => $this->getRedisStorage(),
         };
+
+        if (!self::$truncated[$type]) {
+            $storage->truncate();
+            self::$truncated[$type] = true;
+        }
 
         $engine = new SearchEngine($storage);
         $this->populateStorage($storage, $engine);
@@ -47,7 +58,7 @@ class AliceSearchEngineTest extends TestCase
     }
 
     /**
-     * @return array<array{string, float, int}>
+     * @return array<array{string, string, float, int}>
      */
     public static function provideSearches(): array
     {
@@ -74,7 +85,6 @@ class AliceSearchEngineTest extends TestCase
             ['dbal', 'winder', 0.05, 35], //winter, wander, wider, wonder
             ['dbal', '"“I advise you to leave off this minute!”"', 0.05, 1],
 
-
             ['redis', 'Ali*', 0.15, 403],
             ['redis', 'Mabel', 0.12, 4],
             ['redis', 'Alice', 0.15, 400],
@@ -82,7 +92,6 @@ class AliceSearchEngineTest extends TestCase
             ['redis', 'Alice NOT(wonderland)', 0.15, 395],
             ['redis', 'Hatter', 0.12, 57],
             ['redis', 'gryphon', 0.15, 55],
-            ['dbal', 'griphon', 0.15, 55],
             ['redis', 'griphon', 0.15, 55],
             ['redis', 'winder', 0.3, 35], //winter, wander, wider, wonder
             ['redis', '"advise"', 0.4, 1],

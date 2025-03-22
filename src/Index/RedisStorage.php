@@ -21,12 +21,14 @@ use PHPhinder\Utils\StringHelper;
 use PHPhinder\Utils\TypoTolerance;
 use Predis\Client;
 use Predis\Command\Argument\Search\CreateArguments;
+use Predis\Command\Argument\Search\SchemaFields\NumericField;
 use Predis\Command\Argument\Search\SchemaFields\TextField;
 use Toflar\StateSetIndex\Levenshtein;
 
 class RedisStorage extends AbstractStorage implements Storage
 {
-    public const FT_NS_NANE = 'fulltext';
+    public const FT_NS_NAME = 'fulltext';
+    public const FT_NS_STATE = 'state';
 
     /** @var RedisIndex  */
     protected Index $state;
@@ -84,27 +86,26 @@ class RedisStorage extends AbstractStorage implements Storage
     {
         $fulltextVariables = array_filter($this->schemaVariables, fn ($var) => $var & Schema::IS_STORED && $var & Schema::IS_FULLTEXT);
         if (count($fulltextVariables) > 0) {
-            try {
-                $this->client->ftdropindex(sprintf('%s.%s', StringHelper::getShortClass($this->schema::class), self::FT_NS_NANE));
-                $this->client->ftinfo(
-                    sprintf('%s.%s', StringHelper::getShortClass($this->schema::class), self::FT_NS_NANE)
-                );
-            } catch (\Exception $_) {
-                $this->client->ftcreate(
-                    sprintf('%s.%s', StringHelper::getShortClass($this->schema::class), self::FT_NS_NANE),
-                    array_map(fn (string $field) => new TextField($field), array_keys($fulltextVariables)),
-                    (new CreateArguments())->prefix(
-                        [sprintf('phphinder:%s:', sprintf('%s:%s', StringHelper::getShortClass($this->schema::class), 'docs'))]
-                    )->stopWords([])
-                );
-            }
+            $this->generateFulltextIndex($fulltextVariables);
+        }
+        foreach ($this->schemaVariables as $name => $options) {
+            $this->generateStateIndex($name);
         }
     }
 
     public function truncate(): void
     {
         try {
-            $this->client->ftdropindex(sprintf('%s.%s', StringHelper::getShortClass($this->schema::class), self::FT_NS_NANE));
+            $this->client->ftdropindex(sprintf('%s.%s', StringHelper::getShortClass($this->schema::class), self::FT_NS_NAME));
+
+            foreach ($this->schemaVariables as $name => $options) {
+                $this->client->ftdropindex(sprintf('%s.%s.%s', StringHelper::getShortClass($this->schema::class), $name, self::FT_NS_STATE));
+            }
+
+            $keys = $this->client->keys(sprintf('phphinder:%s:*', StringHelper::getShortClass($this->schema::class)));
+            foreach ($keys as $key) {
+                $this->client->del($key);
+            }
         } catch (\Exception $_) {
         }
 
@@ -143,6 +144,40 @@ class RedisStorage extends AbstractStorage implements Storage
         }
     }
 
+    public function generateFulltextIndex(array $fulltextVariables): void
+    {
+        $redisIndexName = sprintf('%s.%s', StringHelper::getShortClass($this->schema::class), self::FT_NS_NAME);
+
+        try {
+            $this->client->ftinfo($redisIndexName);
+        } catch (\Exception $_) {
+            $this->client->ftcreate(
+                $redisIndexName,
+                array_map(fn(string $field) => new TextField($field), array_keys($fulltextVariables)),
+                (new CreateArguments())->prefix(
+                    [sprintf('phphinder:%s:%s:', StringHelper::getShortClass($this->schema::class), 'docs')]
+                )->stopWords([])
+            );
+        }
+    }
+
+    public function generateStateIndex(string $name): void
+    {
+        $redisIndexName = sprintf('%s.%s.%s', StringHelper::getShortClass($this->schema::class), $name, self::FT_NS_STATE);
+
+        try {
+            $this->client->ftinfo($redisIndexName);
+        } catch (\Exception $_) {
+            $this->client->ftcreate(
+                $redisIndexName,
+                [new NumericField(self::STATE)],
+                (new CreateArguments())->prefix(
+                    [sprintf('phphinder:%s:%s:', StringHelper::getShortClass($this->schema::class), $name)]
+                )->stopWords([])
+            );
+        }
+    }
+
     /**
      * @param RedisIndex $index
      * @return array<string, int|float|bool|string>
@@ -176,26 +211,7 @@ class RedisStorage extends AbstractStorage implements Storage
      */
     protected function loadByStates(Index $index, array $states): \Generator
     {
-        $keys = [];
-        foreach ($this->state->findAll([self::STATE => $states]) as $value) {
-            unset($value[self::STATE]);
-            if (0 === count($value)) {
-                continue;
-            }
-            $keys = array_merge($keys, array_keys($value));
-        }
-        dump([self::STATE => $states]);
-        if (0 === count($keys)) {
-            return [];
-        }
-
-        foreach ($keys as $key) {
-            $indexTerm = $index->find([self::KEY => $key]);
-            if ([] === $indexTerm) {
-                continue;
-            }
-            yield $indexTerm;
-        }
+        return $index->findAll([self::STATE => $states]);
     }
 
     /**
@@ -204,10 +220,6 @@ class RedisStorage extends AbstractStorage implements Storage
      */
     protected function save(Index $index, array $search, array $data, ?callable $hitCallback = null): void
     {
-        if (in_array($index, $this->indices, true) && isset($data[self::STATE])) {
-            $this->state->set([self::STATE => $data[self::STATE]], [$data[self::KEY] => true]);
-            unset($data[self::STATE]);
-        }
         $index->set($search, $data);
     }
 

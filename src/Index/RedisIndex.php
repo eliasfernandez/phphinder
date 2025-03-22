@@ -108,8 +108,34 @@ class RedisIndex implements Index
             $search = [$this->key => $results];
         }
 
-        foreach ($search[$this->key] as $value) {
-            yield $this->parseResult($this->client->hgetall($value));
+        if (null !== $search[RedisStorage::STATE]) {
+            if ($this->key === RedisStorage::STATE) {
+                foreach ($search[RedisStorage::STATE] as $value) {
+                    yield [RedisStorage::STATE => intval(str_replace(sprintf('phphinder:%s:', $this->pattern), '', $value))];
+                }
+            } else {
+                $key = key($search);
+                $states = current($search);
+                foreach ($states as $state) {
+                    $command = [
+                        'FT.SEARCH',
+                        sprintf('%s.%s', str_replace(':', '.', $this->pattern), RedisStorage::FT_NS_STATE),
+                        sprintf('@%s:[%s %s]', $key, $state, $state),
+                        'NOCONTENT'
+                    ];
+                    $result = $this->client->executeRaw($command);
+                    array_shift($result);
+                    if (count($result) > 0) {
+                        foreach ($result as $value) {
+                            yield $this->parseResult($this->client->hgetall($value));
+                        }
+                    }
+                }
+            }
+        } else {
+            foreach ($search[$this->key] as $value) {
+                yield $this->parseResult($this->client->hgetall($value));
+            }
         }
     }
 
@@ -146,14 +172,14 @@ class RedisIndex implements Index
         $value = current($search);
         $command = [
             'FT.SEARCH',
-            sprintf('%s.%s', str_replace(':docs', '', $this->pattern), RedisStorage::FT_NS_NANE),
+            sprintf('%s.%s', str_replace(':docs', '', $this->pattern), RedisStorage::FT_NS_NAME),
             sprintf('@%s:("%s")', $key, $value),
             'NOCONTENT'
         ];
         $result = $this->client->executeRaw($command);
 
+        array_shift($result);
         if (count($result) > 0) {
-            array_shift($result);
             foreach ($result as $item) {
                 yield ['id' => str_replace(sprintf('phphinder:%s:', $this->pattern), '', $item)];
             }
