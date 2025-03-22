@@ -183,6 +183,16 @@ class SearchEngineTest extends TestCase
         $this->assertTrue($results[1]->isFulltext());
     }
 
+
+
+    #[DataProvider('searchEnginesProvider')]
+    public function testSearchNotExistingIndex(SearchEngine $engine): void
+    {
+        $results = $engine->search('color:white');
+
+        $this->assertCount(0, $results);
+    }
+
     /**
      * @return array<string, array<SearchEngine>>
      */

@@ -171,6 +171,9 @@ abstract class AbstractStorage implements Storage
 
     public function loadIndex(string $name, int|float|bool|string $term): array
     {
+        if (!isset($this->indices[$name])) {
+            return [];
+        }
          /** @var array{k: string, ids?: string} $doc */
         $doc = $this->load($this->indices[$name], [self::KEY => $term]);
         return isset($doc['ids']) ? explode(',', $doc['ids']) : [];
@@ -178,6 +181,10 @@ abstract class AbstractStorage implements Storage
 
     public function loadIndexWithTypoTolerance(string $name, int|float|bool|string $term): array
     {
+        if (!isset($this->indices[$name])) {
+            return [];
+        }
+
         $ids = [];
         $levenshteinDistance = TypoTolerance::getLevenshteinDistanceForTerm($term);
 
