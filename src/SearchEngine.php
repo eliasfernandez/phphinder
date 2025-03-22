@@ -180,6 +180,7 @@ class SearchEngine
                 self::ANY_SYMBOL !== $query->getField() ? $query->getField() : null
             );
         }
+
         return $this->attachDocuments($termByIndex, $docs);
     }
 
