@@ -1,25 +1,25 @@
 <?php
 
-namespace Tests\Transformer;
+namespace Tests\Unit\Transformer;
 
+use PHPhinder\Transformer\StemmerTransformer;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestDox;
-use PHPhinder\Transformer\LowerCaseTransformer;
 use PHPUnit\Framework\TestCase;
 
-#[CoversClass(LowerCaseTransformer::class)]
-class LowerCaseTransformerTest extends TestCase
+#[CoversClass(StemmerTransformer::class)]
+class StemmerTransformerTest extends TestCase
 {
-    private LowerCaseTransformer $transformer;
+    private StemmerTransformer $transformer;
 
     public function setUp(): void
     {
         parent::setUp();
-        $this->transformer = new LowerCaseTransformer();
+        $this->transformer = new StemmerTransformer();
     }
 
-    #[DataProvider('provideLowerCaseData')]
+    #[DataProvider('provideStemmableWords')]
     #[TestDox('Converting $original results in $expected')]
     public function testTransform(string $original, string $expected): void
     {
@@ -29,13 +29,14 @@ class LowerCaseTransformerTest extends TestCase
     /**
      * @return array<array{string, string}>
      */
-    public static function provideLowerCaseData(): array
+    public static function provideStemmableWords(): array
     {
         return [
-            ['Hello','hello'],
-            ['ESPAÑA','españa'],
-            ['title','title'],
-            ['🤗','🤗']
+            ['accompanied','accompani'],
+            ['witnesses','wit'],
+            ['write','write'],
+            ['test','test'],
+            ['goat', 'goat'],
         ];
     }
 }

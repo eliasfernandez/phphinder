@@ -1,19 +1,17 @@
 <?php
 
-namespace Tests\Query;
+namespace Tests\Unit\Query;
 
-use Couchbase\QueryException;
-use PHPhinder\Query\FullTextQuery;
-use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\TestCase;
 use PHPhinder\Query\AndQuery;
+use PHPhinder\Query\FullTextQuery;
 use PHPhinder\Query\NotQuery;
 use PHPhinder\Query\NullQuery;
 use PHPhinder\Query\OrQuery;
 use PHPhinder\Query\PrefixQuery;
 use PHPhinder\Query\QueryParser;
 use PHPhinder\Query\TermQuery;
-use Tests\TestSchema;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\TestCase;
 
 #[CoversClass(QueryParser::class)]
 class QueryParserTest extends TestCase

@@ -1,19 +1,19 @@
 <?php
 
-namespace Tests;
+namespace Tests\Integration;
 
 use PHPhinder\Index\DbalStorage;
+use PHPhinder\Index\JsonStorage;
 use PHPhinder\Index\RedisStorage;
 use PHPhinder\Index\Storage;
-use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\Attributes\DataProvider;
-use PHPUnit\Framework\TestCase;
-use PHPhinder\Index\JsonStorage;
 use PHPhinder\SearchEngine;
 use PHPhinder\Token\RegexTokenizer;
 use PHPhinder\Transformer\LowerCaseTransformer;
 use PHPhinder\Transformer\StemmerTransformer;
 use PHPhinder\Transformer\StopWordsFilter;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\TestCase;
 
 #[CoversClass(SearchEngine::class)]
 class SearchEngineTest extends TestCase
@@ -194,7 +194,7 @@ class SearchEngineTest extends TestCase
     }
 
     /**
-     * @return array<string, array<SearchEngine>>
+     * @return array<string, SearchEngine>
      */
     public static function searchEnginesProvider(): array
     {
@@ -204,7 +204,7 @@ class SearchEngineTest extends TestCase
         ), new RegexTokenizer());
         $jsonEngine = self::createSearchEngine($storage);
 
-        $storage = new DbalStorage('pdo-sqlite:///var/test.sqlite', new TestSchema(
+        $storage = new DbalStorage('pgsql://postgres:test@127.0.0.1:5432/phphinder?serverVersion=16&charset=utf8', new TestSchema(
             new LowerCaseTransformer('en', StopWordsFilter::class),
             new StemmerTransformer('en')
         ), new RegexTokenizer());

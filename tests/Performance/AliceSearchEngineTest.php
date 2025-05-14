@@ -1,20 +1,20 @@
 <?php
 
-namespace Tests\Stress;
+namespace Tests\Performance;
 
 use PHPhinder\Index\DbalStorage;
+use PHPhinder\Index\JsonStorage;
 use PHPhinder\Index\RedisStorage;
 use PHPhinder\Index\Storage;
-use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\Attributes\DataProvider;
-use PHPUnit\Framework\TestCase;
-use PHPhinder\Index\JsonStorage;
 use PHPhinder\SearchEngine;
 use PHPhinder\Token\RegexTokenizer;
 use PHPhinder\Transformer\LowerCaseTransformer;
 use PHPhinder\Transformer\StemmerTransformer;
 use PHPhinder\Transformer\StopWordsFilter;
 use PHPhinder\Transformer\SymbolTransformer;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\TestCase;
 
 #[CoversClass(SearchEngine::class)]
 class AliceSearchEngineTest extends TestCase
@@ -115,7 +115,7 @@ class AliceSearchEngineTest extends TestCase
 
     private function getDbalStorage(): DbalStorage
     {
-        return new DbalStorage('pdo-sqlite:///var/alice.sqlite', new LineSchema(
+        return new DbalStorage('pgsql://postgres:test@127.0.0.1:5432/phphinder?serverVersion=16&charset=utf8', new LineSchema(
             new LowerCaseTransformer('en', StopWordsFilter::class),
             new SymbolTransformer(),
             new StemmerTransformer('en')

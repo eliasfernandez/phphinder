@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Index;
+namespace Tests\Integration\Index;
 
 use PHPhinder\Index\DbalIndex;
 use PHPUnit\Framework\Attributes\CoversClass;

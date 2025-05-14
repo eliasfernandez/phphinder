@@ -1,10 +1,10 @@
 <?php
 
-namespace Tests\Utils;
+namespace Tests\Unit\Utils;
 
+use PHPhinder\Utils\IDEncoder;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use PHPhinder\Utils\IDEncoder;
 
 #[CoversClass(IDEncoder::class)]
 class IDEncoderTest extends TestCase

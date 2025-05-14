@@ -1,0 +1,24 @@
+services:
+  db:
+    image: postgres:${POSTGRES_VERSION:-16}-alpine
+    environment:
+      POSTGRES_DB: phphinder
+      POSTGRES_PASSWORD: test
+    healthcheck:
+      test: ["CMD", "pg_isready", "-d", "phphinder", "-U", "postgres"]
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    volumes:
+      - db_data:/var/lib/postgresql/data:rw
+    ports:
+    - "5432:5432"
+
+  redis:
+    image: redis/redis-stack-server
+    ports:
+      - "6379:6379"
+
+
+volumes:
+  db_data:

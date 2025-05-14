@@ -1,11 +1,11 @@
 <?php
 
-namespace Tests\Transformer;
+namespace Tests\Unit\Transformer;
 
+use PHPhinder\Transformer\StopWordsFilter;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\TestDox;
-use PHPhinder\Transformer\StopWordsFilter;
 use PHPUnit\Framework\TestCase;
 
 #[CoversClass(StopWordsFilter::class)]

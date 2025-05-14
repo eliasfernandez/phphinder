@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Stress;
+namespace Tests\Performance;
 
 use PHPhinder\Schema\Schema;
 use PHPhinder\Schema\SchemaTrait;

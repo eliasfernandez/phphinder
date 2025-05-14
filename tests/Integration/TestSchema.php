@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests;
+namespace Tests\Integration;
 
 use PHPhinder\Schema\Schema;
 use PHPhinder\Schema\SchemaTrait;

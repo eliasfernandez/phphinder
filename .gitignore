@@ -3,5 +3,3 @@
 var
 vendor
 !var/stopwords
-phpunit.xml
-
