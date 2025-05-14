@@ -20,7 +20,7 @@
         }
     ],
     "require": {
-        "wamania/php-stemmer": "3.0.1",
+        "wamania/php-stemmer": "^3.0",
         "doctrine/dbal": "^3",
         "toflar/state-set-index": "^3.0",
         "predis/predis": "^2"
