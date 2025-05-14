@@ -141,9 +141,6 @@ class DbalStorage extends AbstractStorage implements Storage
         return $index->find($search);
     }
 
-    /**
-     * @param DbalIndex $index
-     */
     protected function loadDocs(array $search): \Generator
     {
         return $this->docs->findAll(['id' => $search], [ArrayParameterType::STRING]);

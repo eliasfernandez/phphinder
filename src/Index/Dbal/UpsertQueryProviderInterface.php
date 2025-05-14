@@ -20,7 +20,7 @@ interface UpsertQueryProviderInterface
      * - `s`
      * Or, what is the same, the key on the table.
      * @param array<int, string> $columns
-     * @param array<string, mixed> $data
+     * @param array<int, array<string, mixed>> $data
      */
     public function getUpsertBatchQuery(string $tableName, array $columns, array $data): string;
 }

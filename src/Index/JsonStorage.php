@@ -164,6 +164,7 @@ class JsonStorage extends AbstractStorage implements Storage
             \exec('which grep');
             return $this->docs->findContaining($search);
         } catch (\Throwable $_) {
+            throw new StorageException('Failed to load fulltext. Is `grep` executable?');
         }
     }
 

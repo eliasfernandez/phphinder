@@ -194,7 +194,7 @@ class SearchEngineTest extends TestCase
     }
 
     /**
-     * @return array<string, SearchEngine>
+     * @return array<string, SearchEngine[]>
      */
     public static function searchEnginesProvider(): array
     {

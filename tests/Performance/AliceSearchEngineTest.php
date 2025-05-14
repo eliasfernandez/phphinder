@@ -2,6 +2,7 @@
 
 namespace Tests\Performance;
 
+use PHPhinder\Exception\StorageException;
 use PHPhinder\Index\DbalStorage;
 use PHPhinder\Index\JsonStorage;
 use PHPhinder\Index\RedisStorage;
@@ -31,6 +32,7 @@ class AliceSearchEngineTest extends TestCase
             'json' => $this->getJsonStorage(),
             'dbal' => $this->getDbalStorage(),
             'redis' => $this->getRedisStorage(),
+            default => throw new StorageException('Unexpected type: ' . $type),
         };
 
         if (!self::$truncated[$type]) {

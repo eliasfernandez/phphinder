@@ -32,5 +32,11 @@ jobs:
     - name: Install dependencies
       run: composer install --prefer-dist --no-progress
 
+    - name: Coding standards
+      run: vendor/bin/phpcs -n
+
+    - name: Static analysis
+      run: vendor/bin/phpstan
+
     - name: Run test suite
       run: vendor/bin/phpunit --testsuite=unit
